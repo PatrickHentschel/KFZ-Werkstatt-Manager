@@ -1,0 +1,73 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: werkstatt_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-werkstattclone}
+      POSTGRES_USER: ${POSTGRES_USER:-werkstatt}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_dev}
+    ports:
+      - "5537:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-werkstatt} -d ${POSTGRES_DB:-werkstattclone}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: werkstatt_backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://${POSTGRES_USER:-werkstatt}:${POSTGRES_PASSWORD:-changeme_dev}@db:5432/${POSTGRES_DB:-werkstattclone}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-dev-access-secret-min-32-chars-xyz}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev-refresh-secret-min-32-chars-xyz}
+      JWT_ACCESS_EXPIRES_IN: ${JWT_ACCESS_EXPIRES_IN:-15m}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      PORT: 3000
+      FRONTEND_URL: http://localhost:5273
+    ports:
+      - "3009:3000"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - uploads_data:/app/uploads
+      - pdfs_data:/app/pdfs
+    command: npm run dev
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: werkstatt_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment: {}
+    ports:
+      - "5273:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm run dev -- --host
+
+volumes:
+  postgres_data:
+  uploads_data:
+  pdfs_data:

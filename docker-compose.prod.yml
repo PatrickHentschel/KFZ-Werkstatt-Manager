@@ -1,0 +1,85 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: werkstatt_db_prod
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: werkstatt_backend_prod
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_ACCESS_EXPIRES_IN: ${JWT_ACCESS_EXPIRES_IN:-15m}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      PORT: 3000
+      FRONTEND_URL: ${FRONTEND_URL}
+    volumes:
+      - uploads_data:/app/uploads
+      - pdfs_data:/app/pdfs
+    networks:
+      - internal
+      - external
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: werkstatt_frontend_prod
+    restart: always
+    networks:
+      - internal
+
+  nginx:
+    image: nginx:alpine
+    container_name: werkstatt_nginx
+    restart: always
+    depends_on:
+      - backend
+      - frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d
+      - certbot_data:/etc/letsencrypt
+      - certbot_webroot:/var/www/certbot
+    networks:
+      - external
+
+networks:
+  internal:
+    driver: bridge
+  external:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  uploads_data:
+  pdfs_data:
+  certbot_data:
+  certbot_webroot:
