@@ -41,12 +41,7 @@ export function PartsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Teile & Lager</h1>
-        <Button onClick={() => { setEditPart(undefined); setDialogOpen(true); }}>
-          <Plus className="mr-2 h-4 w-4" /> Neues Teil
-        </Button>
-      </div>
+      <h1 className="text-3xl font-bold">Teile & Lager</h1>
 
       <div className="flex items-center gap-2">
         <div className="relative flex-1 max-w-sm">
@@ -69,6 +64,9 @@ export function PartsPage() {
         >
           <AlertTriangle className="h-4 w-4" />
           Mindestbestand
+        </Button>
+        <Button onClick={() => { setEditPart(undefined); setDialogOpen(true); }}>
+          <Plus className="mr-2 h-4 w-4" /> Neues Teil
         </Button>
       </div>
 

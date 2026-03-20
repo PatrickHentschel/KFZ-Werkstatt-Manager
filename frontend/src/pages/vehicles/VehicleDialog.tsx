@@ -199,8 +199,8 @@ export function VehicleDialog({ open, onClose, initialData }: Props) {
               </div>
 
               {/* Required vehicle fields */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2 space-y-1">
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-1">
                   <Label>
                     Kennzeichen <span className="text-destructive">*</span>
                   </Label>
@@ -245,7 +245,7 @@ export function VehicleDialog({ open, onClose, initialData }: Props) {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-1">
                   <Label>Baujahr</Label>
                   <Input
