@@ -9,7 +9,9 @@ type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'cancelled';
 export class InvoicesService {
   async list(tenantId: string, query: any) {
     const { page, pageSize, offset, limit } = getPaginationParams(query);
-    const whereClause = eq(invoices.tenantId, tenantId);
+    const conditions = [eq(invoices.tenantId, tenantId)];
+    if (query.status) conditions.push(eq(invoices.status, query.status as InvoiceStatus));
+    const whereClause = and(...conditions)!;
 
     const [data, countResult] = await Promise.all([
       db.query.invoices.findMany({
