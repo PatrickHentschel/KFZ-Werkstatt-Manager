@@ -1,6 +1,6 @@
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, or, ilike, inArray } from 'drizzle-orm';
 import { db } from '../../db';
-import { orders, orderItems, tenants, timeEntries } from '../../db/schema';
+import { orders, orderItems, tenants, timeEntries, customers, vehicles } from '../../db/schema';
 import { errors } from '../../utils/errors';
 import { getPaginationParams, buildPaginatedResponse } from '../../utils/pagination';
 
@@ -15,13 +15,32 @@ const STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
 };
 
 export class OrdersService {
-  async list(tenantId: string, query: { page?: number; pageSize?: number; status?: string }) {
+  async list(tenantId: string, query: { page?: number; pageSize?: number; status?: string; search?: string }) {
     const { page, pageSize, offset, limit } = getPaginationParams(query);
-    let whereClause = eq(orders.tenantId, tenantId);
+    const conditions = [eq(orders.tenantId, tenantId)];
 
     if (query.status) {
-      whereClause = and(whereClause, eq(orders.status, query.status as OrderStatus)) as typeof whereClause;
+      conditions.push(eq(orders.status, query.status as OrderStatus));
     }
+
+    if (query.search) {
+      const s = `%${query.search}%`;
+      const matchingCustomerIds = db
+        .select({ id: customers.id })
+        .from(customers)
+        .where(or(ilike(customers.firstName, s), ilike(customers.lastName, s), ilike(customers.companyName, s)));
+      const matchingVehicleIds = db
+        .select({ id: vehicles.id })
+        .from(vehicles)
+        .where(or(ilike(vehicles.licensePlate, s), ilike(vehicles.make, s), ilike(vehicles.model, s)));
+      conditions.push(or(
+        ilike(orders.orderNumber, s),
+        inArray(orders.customerId, matchingCustomerIds),
+        inArray(orders.vehicleId, matchingVehicleIds),
+      )!);
+    }
+
+    const whereClause = and(...conditions)!;
 
     const [data, countResult] = await Promise.all([
       db.query.orders.findMany({

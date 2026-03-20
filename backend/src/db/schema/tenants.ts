@@ -16,6 +16,8 @@ export const tenants = pgTable('tenants', {
   invoiceCounter: integer('invoice_counter').notNull().default(1),
   plan: tenantPlanEnum('plan').notNull().default('trial'),
   logoUrl: text('logo_url'),
+  googleClientId: varchar('google_client_id', { length: 255 }),
+  googleClientSecret: varchar('google_client_secret', { length: 255 }),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });

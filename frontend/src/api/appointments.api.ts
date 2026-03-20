@@ -32,7 +32,7 @@ export interface CreateEventRequest {
 
 export const appointmentsApi = {
   getStatus: () => apiClient.get<{ connected: boolean }>('/appointments/status'),
-  getAuthUrl: () => `${apiClient.defaults.baseURL}/appointments/auth/google`,
+  getAuthUrl: () => apiClient.get<{ url: string }>('/appointments/auth/google/url'),
   disconnect: () => apiClient.delete('/appointments/auth/google'),
   listCalendars: () => apiClient.get<GoogleCalendar[]>('/appointments/calendars'),
   selectCalendar: (calendarId: string) => apiClient.post('/appointments/calendars/select', { calendarId }),

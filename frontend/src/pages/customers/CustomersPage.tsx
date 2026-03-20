@@ -44,12 +44,7 @@ export function CustomersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Kunden</h1>
-        <Button onClick={handleNew}>
-          <Plus className="mr-2 h-4 w-4" /> Neuer Kunde
-        </Button>
-      </div>
+      <h1 className="text-3xl font-bold">Kunden</h1>
 
       <div className="flex items-center gap-2">
         <div className="relative flex-1 max-w-sm">
@@ -61,6 +56,9 @@ export function CustomersPage() {
             className="pl-9"
           />
         </div>
+        <Button onClick={handleNew}>
+          <Plus className="mr-2 h-4 w-4" /> Neuer Kunde
+        </Button>
       </div>
 
       <Card>

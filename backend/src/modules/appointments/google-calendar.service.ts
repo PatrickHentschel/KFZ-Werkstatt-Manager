@@ -2,7 +2,7 @@ import { google, calendar_v3 } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
 import { eq } from 'drizzle-orm';
 import { db } from '../../db';
-import { googleTokens } from '../../db/schema';
+import { googleTokens, tenants } from '../../db/schema';
 import { errors } from '../../utils/errors';
 
 const SCOPES = [
@@ -10,18 +10,33 @@ const SCOPES = [
   'https://www.googleapis.com/auth/calendar.events',
 ];
 
-function createOAuthClient(): OAuth2Client {
+function createOAuthClient(clientId: string, clientSecret: string): OAuth2Client {
   return new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID!,
-    process.env.GOOGLE_CLIENT_SECRET!,
+    clientId,
+    clientSecret,
     process.env.GOOGLE_REDIRECT_URI!
   );
 }
 
 export class GoogleCalendarService {
+  // Fetch tenant OAuth credentials from DB and build an OAuth2Client
+  private async getOAuthClient(tenantId: string): Promise<OAuth2Client> {
+    const tenant = await db.query.tenants.findFirst({ where: eq(tenants.id, tenantId) });
+    if (!tenant?.googleClientId || !tenant?.googleClientSecret) {
+      throw errors.badRequest('Google OAuth Credentials nicht konfiguriert. Bitte Client ID und Secret in den Einstellungen hinterlegen.');
+    }
+    return createOAuthClient(tenant.googleClientId, tenant.googleClientSecret);
+  }
+
+  // Check whether a tenant has configured their Google OAuth credentials
+  async credentialsConfigured(tenantId: string): Promise<boolean> {
+    const tenant = await db.query.tenants.findFirst({ where: eq(tenants.id, tenantId) });
+    return !!(tenant?.googleClientId && tenant?.googleClientSecret);
+  }
+
   // Generate the OAuth2 URL the tenant must visit to authorize
-  getAuthUrl(state: string): string {
-    const oauth2Client = createOAuthClient();
+  async getAuthUrl(tenantId: string, state: string): Promise<string> {
+    const oauth2Client = await this.getOAuthClient(tenantId);
     return oauth2Client.generateAuthUrl({
       access_type: 'offline',
       scope: SCOPES,
@@ -32,7 +47,7 @@ export class GoogleCalendarService {
 
   // Exchange code for tokens and store them
   async handleCallback(tenantId: string, code: string): Promise<void> {
-    const oauth2Client = createOAuthClient();
+    const oauth2Client = await this.getOAuthClient(tenantId);
     const { tokens } = await oauth2Client.getToken(code);
 
     if (!tokens.access_token) throw errors.badRequest('No access token received from Google');
@@ -63,10 +78,10 @@ export class GoogleCalendarService {
     });
 
     if (!tokenRecord) {
-      throw errors.badRequest('Google Calendar not connected. Please authorize at /api/v1/appointments/auth/google');
+      throw errors.badRequest('Google Calendar not connected. Please authorize at /api/v1/appointments/auth/google/url');
     }
 
-    const oauth2Client = createOAuthClient();
+    const oauth2Client = await this.getOAuthClient(tenantId);
     oauth2Client.setCredentials({
       access_token: tokenRecord.accessToken,
       refresh_token: tokenRecord.refreshToken ?? undefined,
@@ -216,7 +231,7 @@ export class GoogleCalendarService {
 
     if (tokenRecord) {
       try {
-        const oauth2Client = createOAuthClient();
+        const oauth2Client = await this.getOAuthClient(tenantId);
         await oauth2Client.revokeToken(tokenRecord.accessToken);
       } catch {
         // Ignore revoke errors

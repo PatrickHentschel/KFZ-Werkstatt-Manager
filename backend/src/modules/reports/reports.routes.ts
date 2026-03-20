@@ -1,7 +1,7 @@
 import { FastifyPluginAsync } from 'fastify';
-import { eq, and, gte, lte, sql, count } from 'drizzle-orm';
+import { eq, and, gte, lte, sql, count, inArray } from 'drizzle-orm';
 import { db } from '../../db';
-import { orders, invoices, invoiceItems, timeEntries, staff } from '../../db/schema';
+import { orders, invoices, invoiceItems, timeEntries, staff, orderItems, parts } from '../../db/schema';
 
 const reportsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('preHandler', fastify.authenticate);
@@ -100,6 +100,101 @@ const reportsRoutes: FastifyPluginAsync = async (fastify) => {
     return {
       period: { from: from || null, to: to || null },
       staff: Array.from(staffMap.entries()).map(([staffId, data]) => ({ staffId, ...data })),
+    };
+  });
+
+  // Top customers by revenue or visit frequency
+  fastify.get('/top-customers', async (request) => {
+    const { from, to, limit = '10' } = request.query as { from?: string; to?: string; limit?: string };
+    const tenantId = request.user.tenantId;
+
+    const whereClause = and(
+      eq(invoices.tenantId, tenantId),
+      eq(invoices.status, 'paid'),
+      from ? gte(invoices.issueDate, from) : undefined,
+      to ? lte(invoices.issueDate, to) : undefined,
+    );
+
+    const paidInvoices = await db.query.invoices.findMany({
+      where: () => whereClause!,
+      with: { items: true, customer: true },
+    });
+
+    const map = new Map<string, { customerId: string; name: string; type: string; invoiceCount: number; totalNet: number }>();
+    for (const inv of paidInvoices) {
+      const c = inv.customer;
+      const name = c.type === 'business' ? (c.companyName || `${c.firstName} ${c.lastName}`) : `${c.firstName} ${c.lastName}`;
+      const existing = map.get(c.id) || { customerId: c.id, name, type: c.type, invoiceCount: 0, totalNet: 0 };
+      existing.invoiceCount += 1;
+      for (const item of inv.items) {
+        existing.totalNet += Number(item.quantity) * Number(item.unitPrice);
+      }
+      map.set(c.id, existing);
+    }
+
+    const customers = Array.from(map.values())
+      .map(c => ({ ...c, totalNet: Math.round(c.totalNet * 100) / 100 }))
+      .slice(0, Number(limit));
+
+    return { customers };
+  });
+
+  // Revenue breakdown: labor vs parts + gross profit
+  fastify.get('/revenue-breakdown', async (request) => {
+    const { from, to } = request.query as { from?: string; to?: string };
+    const tenantId = request.user.tenantId;
+
+    const whereClause = and(
+      eq(invoices.tenantId, tenantId),
+      eq(invoices.status, 'paid'),
+      from ? gte(invoices.issueDate, from) : undefined,
+      to ? lte(invoices.issueDate, to) : undefined,
+    );
+
+    const paidInvoices = await db.query.invoices.findMany({
+      where: () => whereClause!,
+    });
+
+    const orderIds = paidInvoices.map(i => i.orderId).filter(Boolean) as string[];
+
+    let laborNet = 0, partsNet = 0, miscNet = 0, costOfGoods = 0;
+
+    if (orderIds.length > 0) {
+      const items = await db
+        .select({
+          type: orderItems.type,
+          quantity: orderItems.quantity,
+          unitPrice: orderItems.unitPrice,
+          partId: orderItems.partId,
+          purchasePrice: parts.purchasePrice,
+        })
+        .from(orderItems)
+        .leftJoin(parts, eq(orderItems.partId, parts.id))
+        .where(inArray(orderItems.orderId, orderIds));
+
+      for (const item of items) {
+        const net = Number(item.quantity) * Number(item.unitPrice);
+        if (item.type === 'labor') {
+          laborNet += net;
+        } else if (item.type === 'part') {
+          partsNet += net;
+          if (item.purchasePrice) {
+            costOfGoods += Number(item.quantity) * Number(item.purchasePrice);
+          }
+        } else {
+          miscNet += net;
+        }
+      }
+    }
+
+    const round = (n: number) => Math.round(n * 100) / 100;
+    return {
+      period: { from: from || null, to: to || null },
+      laborNet: round(laborNet),
+      partsNet: round(partsNet),
+      miscNet: round(miscNet),
+      costOfGoods: round(costOfGoods),
+      grossProfit: round(laborNet + partsNet + miscNet - costOfGoods),
     };
   });
 

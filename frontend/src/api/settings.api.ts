@@ -5,6 +5,8 @@ export interface TenantSettings {
   address?: string; city?: string; country: string;
   taxId?: string; taxRate: number; invoicePrefix: string;
   invoiceCounter: number; plan: string; logoUrl?: string;
+  googleClientId?: string;
+  googleClientSecretSet?: boolean;
 }
 
 export const settingsApi = {

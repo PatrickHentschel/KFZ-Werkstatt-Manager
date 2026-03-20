@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Calendar, Plus, Link2, Link2Off, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format, startOfWeek, addDays, addWeeks, subWeeks, startOfMonth, endOfMonth, isSameDay, parseISO } from 'date-fns';
@@ -29,6 +29,23 @@ export function AppointmentsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<{ start: string; end: string } | null>(null);
+  const [showCalendarPicker, setShowCalendarPicker] = useState(() =>
+    new URLSearchParams(window.location.search).get('connected') === 'true'
+  );
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('connected') === 'true' || params.get('error')) {
+      window.history.replaceState({}, '', '/appointments');
+    }
+    if (params.get('error')) {
+      const err = params.get('error');
+      toast({
+        variant: 'destructive',
+        title: err === 'google_auth_denied' ? 'Verbindung abgebrochen' : 'Google Verbindung fehlgeschlagen',
+      });
+    }
+  }, []);
 
   const { data: statusData, isLoading: statusLoading } = useQuery({
     queryKey: ['appointments', 'status'],
@@ -37,6 +54,22 @@ export function AppointmentsPage() {
   });
 
   const isConnected = statusData?.data.connected ?? false;
+  const credentialsConfigured = statusData?.data.credentialsConfigured ?? true; // default true to avoid flash
+
+  const { data: calendarsData, isLoading: calendarsLoading } = useQuery({
+    queryKey: ['appointments', 'calendars'],
+    queryFn: () => appointmentsApi.listCalendars(),
+    enabled: showCalendarPicker && isConnected,
+  });
+
+  const selectCalendarMutation = useMutation({
+    mutationFn: (calendarId: string) => appointmentsApi.selectCalendar(calendarId),
+    onSuccess: () => {
+      setShowCalendarPicker(false);
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      toast({ title: 'Kalender verbunden' });
+    },
+  });
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const weekEnd = addDays(weekStart, 6);
@@ -68,8 +101,13 @@ export function AppointmentsPage() {
     },
   });
 
-  const handleConnect = () => {
-    window.location.href = appointmentsApi.getAuthUrl();
+  const handleConnect = async () => {
+    try {
+      const res = await appointmentsApi.getAuthUrl();
+      window.location.href = res.data.url;
+    } catch {
+      toast({ variant: 'destructive', title: 'Fehler', description: 'Verbindung zu Google konnte nicht gestartet werden' });
+    }
   };
 
   const handleSlotClick = (date: Date, hour?: number) => {
@@ -94,6 +132,51 @@ export function AppointmentsPage() {
     setSelectedSlot(null);
   };
 
+  // Calendar picker — shown after OAuth callback
+  if (!statusLoading && isConnected && showCalendarPicker) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold">Termine</h1>
+        <Card className="max-w-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-blue-500" />
+              Kalender auswählen
+            </CardTitle>
+            <CardDescription>
+              Wählen Sie den Google Kalender, der mit WerkstattClone synchronisiert werden soll.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {calendarsLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Kalender werden geladen...
+              </div>
+            ) : (
+              calendarsData?.data.map((cal) => (
+                <button
+                  key={cal.id}
+                  className="w-full flex items-center justify-between rounded-lg border p-3 hover:bg-muted/50 transition-colors text-left"
+                  onClick={() => selectCalendarMutation.mutate(cal.id)}
+                  disabled={selectCalendarMutation.isPending}
+                >
+                  <div className="flex items-center gap-3">
+                    <span
+                      className="h-3 w-3 rounded-full shrink-0"
+                      style={{ backgroundColor: cal.backgroundColor || '#5484ed' }}
+                    />
+                    <span className="text-sm font-medium">{cal.summary}</span>
+                  </div>
+                  {cal.primary && <Badge variant="secondary">Primär</Badge>}
+                </button>
+              ))
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   // Not connected state
   if (!statusLoading && !isConnected) {
     return (
@@ -107,25 +190,37 @@ export function AppointmentsPage() {
             </CardTitle>
             <CardDescription>
               Verbinden Sie Ihren Google Kalender, um Termine direkt in WerkstattClone zu verwalten.
-              Alle Termine werden mit Ihrem Google Kalender synchronisiert.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li className="flex items-center gap-2">
-                <span className="text-green-500">✓</span> Termine erstellen, bearbeiten und löschen
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-green-500">✓</span> Synchronisierung mit Google Kalender auf allen Geräten
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-green-500">✓</span> Farbcodierung nach Mitarbeiter oder Priorität
-              </li>
-            </ul>
-            <Button onClick={handleConnect} className="w-full">
-              <Link2 className="mr-2 h-4 w-4" />
-              Mit Google Calendar verbinden
-            </Button>
+            {!credentialsConfigured ? (
+              <>
+                <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800">
+                  Bevor Sie sich mit Google verbinden können, müssen Sie Ihre Google OAuth Credentials in den Einstellungen hinterlegen.
+                </div>
+                <Button variant="outline" className="w-full" onClick={() => window.location.href = '/settings'}>
+                  Zu den Einstellungen
+                </Button>
+              </>
+            ) : (
+              <>
+                <ul className="space-y-2 text-sm text-muted-foreground">
+                  <li className="flex items-center gap-2">
+                    <span className="text-green-500">✓</span> Termine erstellen, bearbeiten und löschen
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-green-500">✓</span> Synchronisierung mit Google Kalender auf allen Geräten
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-green-500">✓</span> Farbcodierung nach Mitarbeiter oder Priorität
+                  </li>
+                </ul>
+                <Button onClick={handleConnect} className="w-full">
+                  <Link2 className="mr-2 h-4 w-4" />
+                  Mit Google Calendar verbinden
+                </Button>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>

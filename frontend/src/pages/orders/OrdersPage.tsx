@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ordersApi, type Order, type OrderStatus } from '@/api/orders.api';
@@ -41,15 +42,31 @@ const nextStatusLabel: Record<string, string> = {
   done: '→ Verrechnen',
 };
 
+const tabs: { label: string; value: 'all' | OrderStatus }[] = [
+  { label: 'Alle', value: 'all' },
+  { label: 'Offen', value: 'open' },
+  { label: 'In Bearbeitung', value: 'in_progress' },
+  { label: 'Warte auf Teile', value: 'waiting_parts' },
+  { label: 'Fertig', value: 'done' },
+  { label: 'Verrechnet', value: 'invoiced' },
+];
+
 export function OrdersPage() {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [activeTab, setActiveTab] = useState<'all' | OrderStatus>('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['orders', { page }],
-    queryFn: () => ordersApi.list({ page, pageSize: 20 }),
+    queryKey: ['orders', { page, search, activeTab }],
+    queryFn: () => ordersApi.list({
+      page,
+      pageSize: 20,
+      search: search || undefined,
+      status: activeTab !== 'all' ? activeTab : undefined,
+    }),
   });
 
   const createInvoiceMutation = useMutation({
@@ -89,8 +106,34 @@ export function OrdersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Aufträge</h1>
+      <h1 className="text-3xl font-bold">Aufträge</h1>
+
+      <div className="flex gap-1 border-b">
+        {tabs.map((tab) => (
+          <button
+            key={tab.value}
+            onClick={() => { setActiveTab(tab.value); setPage(1); }}
+            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+              activeTab === tab.value
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Aufträge suchen..."
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            className="pl-9"
+          />
+        </div>
         <Button onClick={() => setDialogOpen(true)}>
           <Plus className="mr-2 h-4 w-4" /> Neuer Auftrag
         </Button>

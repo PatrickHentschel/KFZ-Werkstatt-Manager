@@ -1,6 +1,6 @@
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, or, ilike, inArray } from 'drizzle-orm';
 import { db } from '../../db';
-import { invoices, invoiceItems, tenants, orders } from '../../db/schema';
+import { invoices, invoiceItems, tenants, orders, customers } from '../../db/schema';
 import { errors } from '../../utils/errors';
 import { getPaginationParams, buildPaginatedResponse } from '../../utils/pagination';
 
@@ -11,6 +11,18 @@ export class InvoicesService {
     const { page, pageSize, offset, limit } = getPaginationParams(query);
     const conditions = [eq(invoices.tenantId, tenantId)];
     if (query.status) conditions.push(eq(invoices.status, query.status as InvoiceStatus));
+    if (query.search) {
+      const s = `%${query.search}%`;
+      const matchingCustomerIds = db
+        .select({ id: customers.id })
+        .from(customers)
+        .where(or(ilike(customers.firstName, s), ilike(customers.lastName, s), ilike(customers.companyName, s)));
+      conditions.push(or(
+        ilike(invoices.invoiceNumber, s),
+        sql`${invoices.issueDate}::text ilike ${s}`,
+        inArray(invoices.customerId, matchingCustomerIds),
+      )!);
+    }
     const whereClause = and(...conditions)!;
 
     const [data, countResult] = await Promise.all([
