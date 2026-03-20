@@ -18,12 +18,11 @@ const appointmentsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get('/auth/google/url', {
     preHandler: [fastify.authenticate],
   }, async (request) => {
-    const tenantId = request.user.tenantId;
     const state = Buffer.from(JSON.stringify({
-      tenantId,
+      tenantId: request.user.tenantId,
       nonce: crypto.randomBytes(16).toString('hex'),
     })).toString('base64url');
-    const url = await googleCalendarService.getAuthUrl(tenantId, state);
+    const url = googleCalendarService.getAuthUrl(state);
     return { url };
   });
 
@@ -56,12 +55,8 @@ const appointmentsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get('/status', {
     preHandler: [fastify.authenticate],
   }, async (request) => {
-    const tenantId = request.user.tenantId;
-    const [connected, credentialsConfigured] = await Promise.all([
-      googleCalendarService.isConnected(tenantId),
-      googleCalendarService.credentialsConfigured(tenantId),
-    ]);
-    return { connected, credentialsConfigured };
+    const connected = await googleCalendarService.isConnected(request.user.tenantId);
+    return { connected };
   });
 
   // List available Google Calendars (to let user pick which one to use)

@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Save, Building2, FileText, Calendar, Copy, Check } from 'lucide-react';
+import { Save, Building2, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -27,30 +27,6 @@ type FormData = z.infer<typeof schema>;
 
 export function SettingsPage() {
   const queryClient = useQueryClient();
-  const [googleClientId, setGoogleClientId] = useState('');
-  const [googleClientSecret, setGoogleClientSecret] = useState('');
-  const [copiedUri, setCopiedUri] = useState(false);
-
-  const redirectUri = `${window.location.origin}/api/v1/appointments/auth/google/callback`;
-
-  const handleCopyUri = () => {
-    navigator.clipboard.writeText(redirectUri);
-    setCopiedUri(true);
-    setTimeout(() => setCopiedUri(false), 2000);
-  };
-
-  const googleMutation = useMutation({
-    mutationFn: () => settingsApi.update({
-      googleClientId: googleClientId || undefined,
-      googleClientSecret: googleClientSecret || undefined,
-    }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['settings'] });
-      setGoogleClientSecret('');
-      toast({ title: 'Google Credentials gespeichert' });
-    },
-    onError: () => toast({ variant: 'destructive', title: 'Fehler beim Speichern' }),
-  });
 
   const { data, isLoading } = useQuery({
     queryKey: ['settings'],
@@ -76,7 +52,6 @@ export function SettingsPage() {
         taxRate: Number(s.taxRate),
         invoicePrefix: s.invoicePrefix,
       });
-      setGoogleClientId(s.googleClientId || '');
     }
   }, [data]);
 
@@ -196,72 +171,6 @@ export function SettingsPage() {
           </Button>
         </div>
       </form>
-
-      {/* Google Calendar Integration */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" /> Google Calendar Integration
-          </CardTitle>
-          <CardDescription>
-            Eigene Google OAuth Credentials für die Kalender-Synchronisierung
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Setup instructions */}
-          <div className="rounded-lg bg-muted p-4 space-y-2 text-sm">
-            <p className="font-medium">Einrichtung in Google Cloud Console:</p>
-            <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
-              <li>Öffne <span className="font-mono text-xs">console.cloud.google.com</span> → APIs &amp; Services → Anmeldedaten</li>
-              <li>Erstelle eine OAuth 2.0 Client-ID (Anwendungstyp: Webanwendung)</li>
-              <li>Füge folgende URI als autorisierte Weiterleitungs-URI hinzu:</li>
-            </ol>
-            <div className="flex items-center gap-2 mt-1">
-              <code className="flex-1 rounded bg-background border px-3 py-1.5 text-xs font-mono break-all">
-                {redirectUri}
-              </code>
-              <Button variant="outline" size="icon" onClick={handleCopyUri} title="Kopieren">
-                {copiedUri ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-              </Button>
-            </div>
-            <li className="list-decimal list-inside text-muted-foreground">Kopiere Client-ID und Client-Secret unten</li>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Client-ID</Label>
-            <Input
-              value={googleClientId}
-              onChange={(e) => setGoogleClientId(e.target.value)}
-              placeholder="123456789-abc...apps.googleusercontent.com"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Client-Secret</Label>
-            <Input
-              type="password"
-              value={googleClientSecret}
-              onChange={(e) => setGoogleClientSecret(e.target.value)}
-              placeholder={settings?.googleClientSecretSet ? 'Bereits konfiguriert — neu eingeben zum Ändern' : 'GOCSPX-...'}
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            {settings?.googleClientId && (
-              <span className="text-xs text-green-600 flex items-center gap-1">
-                <Check className="h-3 w-3" /> Credentials konfiguriert
-              </span>
-            )}
-            <Button
-              className="ml-auto"
-              onClick={() => googleMutation.mutate()}
-              disabled={googleMutation.isPending || (!googleClientId && !googleClientSecret)}
-            >
-              <Save className="mr-2 h-4 w-4" />
-              {googleMutation.isPending ? 'Wird gespeichert...' : 'Credentials speichern'}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

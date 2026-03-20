@@ -54,7 +54,6 @@ export function AppointmentsPage() {
   });
 
   const isConnected = statusData?.data.connected ?? false;
-  const credentialsConfigured = statusData?.data.credentialsConfigured ?? true; // default true to avoid flash
 
   const { data: calendarsData, isLoading: calendarsLoading } = useQuery({
     queryKey: ['appointments', 'calendars'],
@@ -193,34 +192,21 @@ export function AppointmentsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {!credentialsConfigured ? (
-              <>
-                <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800">
-                  Bevor Sie sich mit Google verbinden können, müssen Sie Ihre Google OAuth Credentials in den Einstellungen hinterlegen.
-                </div>
-                <Button variant="outline" className="w-full" onClick={() => window.location.href = '/settings'}>
-                  Zu den Einstellungen
-                </Button>
-              </>
-            ) : (
-              <>
-                <ul className="space-y-2 text-sm text-muted-foreground">
-                  <li className="flex items-center gap-2">
-                    <span className="text-green-500">✓</span> Termine erstellen, bearbeiten und löschen
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="text-green-500">✓</span> Synchronisierung mit Google Kalender auf allen Geräten
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="text-green-500">✓</span> Farbcodierung nach Mitarbeiter oder Priorität
-                  </li>
-                </ul>
-                <Button onClick={handleConnect} className="w-full">
-                  <Link2 className="mr-2 h-4 w-4" />
-                  Mit Google Calendar verbinden
-                </Button>
-              </>
-            )}
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              <li className="flex items-center gap-2">
+                <span className="text-green-500">✓</span> Termine erstellen, bearbeiten und löschen
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="text-green-500">✓</span> Synchronisierung mit Google Kalender auf allen Geräten
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="text-green-500">✓</span> Farbcodierung nach Mitarbeiter oder Priorität
+              </li>
+            </ul>
+            <Button onClick={handleConnect} className="w-full">
+              <Link2 className="mr-2 h-4 w-4" />
+              Mit Google Calendar verbinden
+            </Button>
           </CardContent>
         </Card>
       </div>

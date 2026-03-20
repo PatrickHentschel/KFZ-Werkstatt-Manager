@@ -14,9 +14,7 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
       where: eq(tenants.id, request.user.tenantId),
     });
     if (!tenant) throw errors.notFound('Tenant');
-    // Never expose the secret — return a boolean flag instead
-    const { googleClientSecret, ...rest } = tenant;
-    return { ...rest, googleClientSecretSet: !!googleClientSecret };
+    return tenant;
   });
 
   // Update tenant settings
@@ -31,8 +29,6 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
       taxId: z.string().optional(),
       taxRate: z.number().min(0).max(100).optional(),
       invoicePrefix: z.string().max(20).optional(),
-      googleClientId: z.string().optional(),
-      googleClientSecret: z.string().optional(),
     });
 
     const body = schema.parse(request.body);
@@ -46,16 +42,13 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
     if (body.taxId !== undefined) updates.taxId = body.taxId;
     if (body.taxRate !== undefined) updates.taxRate = String(body.taxRate);
     if (body.invoicePrefix) updates.invoicePrefix = body.invoicePrefix;
-    if (body.googleClientId !== undefined) updates.googleClientId = body.googleClientId;
-    if (body.googleClientSecret) updates.googleClientSecret = body.googleClientSecret;
 
     const [updated] = await db.update(tenants)
       .set(updates)
       .where(eq(tenants.id, request.user.tenantId))
       .returning();
 
-    const { googleClientSecret, ...rest } = updated;
-    return { ...rest, googleClientSecretSet: !!googleClientSecret };
+    return updated;
   });
 };
 
