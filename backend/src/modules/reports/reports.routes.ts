@@ -5,6 +5,7 @@ import { orders, invoices, invoiceItems, timeEntries, staff, orderItems, parts }
 
 const reportsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('preHandler', fastify.authenticate);
+  fastify.addHook('preHandler', fastify.requireRole('owner', 'admin'));
 
   // Revenue report by period
   fastify.get('/revenue', async (request) => {
