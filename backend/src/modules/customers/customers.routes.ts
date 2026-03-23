@@ -30,19 +30,25 @@ const customersRoutes: FastifyPluginAsync = async (fastify) => {
     return customersService.getById(request.user.tenantId, id);
   });
 
-  fastify.post('/', async (request, reply) => {
+  fastify.post('/', {
+    preHandler: [fastify.requireRole('owner', 'admin', 'reception')],
+  }, async (request, reply) => {
     const body = createCustomerSchema.parse(request.body);
     const customer = await customersService.create(request.user.tenantId, body as any);
     return reply.code(201).send(customer);
   });
 
-  fastify.patch('/:id', async (request, reply) => {
+  fastify.patch('/:id', {
+    preHandler: [fastify.requireRole('owner', 'admin', 'reception')],
+  }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const body = createCustomerSchema.partial().parse(request.body);
     return customersService.update(request.user.tenantId, id, body as any);
   });
 
-  fastify.delete('/:id', async (request, reply) => {
+  fastify.delete('/:id', {
+    preHandler: [fastify.requireRole('owner', 'admin')],
+  }, async (request, reply) => {
     const { id } = request.params as { id: string };
     await customersService.delete(request.user.tenantId, id);
     return reply.code(204).send();

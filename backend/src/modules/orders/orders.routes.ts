@@ -35,13 +35,17 @@ const ordersRoutes: FastifyPluginAsync = async (fastify) => {
     return ordersService.getById(request.user.tenantId, id);
   });
 
-  fastify.post('/', async (request, reply) => {
+  fastify.post('/', {
+    preHandler: [fastify.requireRole('owner', 'admin', 'reception')],
+  }, async (request, reply) => {
     const body = createOrderSchema.parse(request.body);
     const order = await ordersService.create(request.user.tenantId, body);
     return reply.code(201).send(order);
   });
 
-  fastify.patch('/:id', async (request) => {
+  fastify.patch('/:id', {
+    preHandler: [fastify.requireRole('owner', 'admin', 'reception')],
+  }, async (request) => {
     const { id } = request.params as { id: string };
     const body = createOrderSchema.omit({ customerId: true, vehicleId: true }).partial().parse(request.body);
     return ordersService.update(request.user.tenantId, id, body as any);
@@ -53,7 +57,9 @@ const ordersRoutes: FastifyPluginAsync = async (fastify) => {
     return ordersService.updateStatus(request.user.tenantId, id, status);
   });
 
-  fastify.put('/:id/items', async (request) => {
+  fastify.put('/:id/items', {
+    preHandler: [fastify.requireRole('owner', 'admin', 'technician')],
+  }, async (request) => {
     const { id } = request.params as { id: string };
     const { items } = z.object({ items: z.array(orderItemSchema) }).parse(request.body);
     return ordersService.updateItems(request.user.tenantId, id, items);
@@ -64,7 +70,9 @@ const ordersRoutes: FastifyPluginAsync = async (fastify) => {
     return ordersService.listTimeEntries(request.user.tenantId, id);
   });
 
-  fastify.post('/:id/time-entries', async (request, reply) => {
+  fastify.post('/:id/time-entries', {
+    preHandler: [fastify.requireRole('owner', 'admin', 'technician')],
+  }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const body = z.object({
       staffId: z.string().uuid(),
@@ -75,7 +83,9 @@ const ordersRoutes: FastifyPluginAsync = async (fastify) => {
     return reply.code(201).send(entry);
   });
 
-  fastify.post('/:id/invoice', async (request, reply) => {
+  fastify.post('/:id/invoice', {
+    preHandler: [fastify.requireRole('owner', 'admin')],
+  }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const invoice = await invoicesService.createFromOrder(request.user.tenantId, id);
     return reply.code(201).send(invoice);

@@ -31,19 +31,25 @@ const vehiclesRoutes: FastifyPluginAsync = async (fastify) => {
     return vehiclesService.getById(request.user.tenantId, id);
   });
 
-  fastify.post('/', async (request, reply) => {
+  fastify.post('/', {
+    preHandler: [fastify.requireRole('owner', 'admin', 'reception')],
+  }, async (request, reply) => {
     const body = createVehicleSchema.parse(request.body);
     const vehicle = await vehiclesService.create(request.user.tenantId, body as any);
     return reply.code(201).send(vehicle);
   });
 
-  fastify.patch('/:id', async (request) => {
+  fastify.patch('/:id', {
+    preHandler: [fastify.requireRole('owner', 'admin', 'reception')],
+  }, async (request) => {
     const { id } = request.params as { id: string };
     const body = createVehicleSchema.omit({ customerId: true }).partial().parse(request.body);
     return vehiclesService.update(request.user.tenantId, id, body as any);
   });
 
-  fastify.delete('/:id', async (request, reply) => {
+  fastify.delete('/:id', {
+    preHandler: [fastify.requireRole('owner', 'admin')],
+  }, async (request, reply) => {
     const { id } = request.params as { id: string };
     await vehiclesService.delete(request.user.tenantId, id);
     return reply.code(204).send();

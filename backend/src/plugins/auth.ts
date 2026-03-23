@@ -8,6 +8,10 @@ declare module 'fastify' {
   interface FastifyRequest {
     user: JwtPayload;
   }
+  interface FastifyInstance {
+    authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+    requireRole: (...roles: string[]) => (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+  }
 }
 
 const authPlugin: FastifyPluginAsync = async (fastify) => {
@@ -29,12 +33,14 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
       }
     }
   });
-};
 
-declare module 'fastify' {
-  interface FastifyInstance {
-    authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
-  }
-}
+  fastify.decorate('requireRole', function (...roles: string[]) {
+    return async function (request: FastifyRequest, reply: FastifyReply) {
+      if (!request.user || !roles.includes(request.user.role)) {
+        return reply.code(403).send({ statusCode: 403, error: 'Forbidden', message: 'Insufficient permissions' });
+      }
+    };
+  });
+};
 
 export default fp(authPlugin);
