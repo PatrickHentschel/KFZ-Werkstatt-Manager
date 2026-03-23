@@ -18,7 +18,9 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // Update tenant settings
-  fastify.patch('/', async (request) => {
+  fastify.patch('/', {
+    preHandler: [fastify.requireRole('owner', 'admin')],
+  }, async (request) => {
     const schema = z.object({
       name: z.string().min(2).optional(),
       email: z.string().email().optional(),
