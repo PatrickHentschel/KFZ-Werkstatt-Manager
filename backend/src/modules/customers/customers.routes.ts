@@ -13,7 +13,6 @@ const createCustomerSchema = z.object({
   address: z.string().optional(),
   city: z.string().optional(),
   postalCode: z.string().optional(),
-  country: z.string().length(2).default('AT'),
   taxId: z.string().optional(),
   notes: z.string().optional(),
 });

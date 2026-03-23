@@ -40,7 +40,7 @@ export interface TimeEntryWithStaff {
 }
 
 export const ordersApi = {
-  list: (params?: { page?: number; pageSize?: number; status?: string; search?: string }) =>
+  list: (params?: { page?: number; pageSize?: number; status?: string; statuses?: string; search?: string }) =>
     apiClient.get<PaginatedResponse<Order>>('/orders', { params }),
   getById: (id: string) => apiClient.get<Order>(`/orders/${id}`),
   create: (data: {

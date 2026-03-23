@@ -25,7 +25,6 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
       phone: z.string().optional(),
       address: z.string().optional(),
       city: z.string().optional(),
-      country: z.string().length(2).optional(),
       taxId: z.string().optional(),
       taxRate: z.number().min(0).max(100).optional(),
       invoicePrefix: z.string().max(20).optional(),
@@ -38,7 +37,6 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
     if (body.phone !== undefined) updates.phone = body.phone;
     if (body.address !== undefined) updates.address = body.address;
     if (body.city !== undefined) updates.city = body.city;
-    if (body.country) updates.country = body.country;
     if (body.taxId !== undefined) updates.taxId = body.taxId;
     if (body.taxRate !== undefined) updates.taxRate = String(body.taxRate);
     if (body.invoicePrefix) updates.invoicePrefix = body.invoicePrefix;

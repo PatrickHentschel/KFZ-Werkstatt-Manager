@@ -17,7 +17,6 @@ const schema = z.object({
   phone: z.string().optional(),
   address: z.string().optional(),
   city: z.string().optional(),
-  country: z.string().length(2, 'Zweistelliger Ländercode (z.B. AT)'),
   taxId: z.string().optional(),
   taxRate: z.number().min(0).max(100),
   invoicePrefix: z.string().max(20),
@@ -35,7 +34,7 @@ export function SettingsPage() {
 
   const { register, handleSubmit, reset, formState: { errors, isDirty } } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { country: 'AT', taxRate: 20, invoicePrefix: 'RE' },
+    defaultValues: { taxRate: 20, invoicePrefix: 'RE' },
   });
 
   useEffect(() => {
@@ -47,7 +46,6 @@ export function SettingsPage() {
         phone: s.phone || '',
         address: s.address || '',
         city: s.city || '',
-        country: s.country || 'AT',
         taxId: s.taxId || '',
         taxRate: Number(s.taxRate),
         invoicePrefix: s.invoicePrefix,
@@ -116,16 +114,9 @@ export function SettingsPage() {
               <Label>Adresse</Label>
               <Input {...register('address')} placeholder="Musterstraße 1" />
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-2">
-                <Label>Stadt</Label>
-                <Input {...register('city')} placeholder="Wien" />
-              </div>
-              <div className="space-y-2">
-                <Label>Land</Label>
-                <Input {...register('country')} placeholder="AT" maxLength={2} />
-                {errors.country && <p className="text-xs text-destructive">{errors.country.message}</p>}
-              </div>
+            <div className="space-y-2">
+              <Label>Stadt</Label>
+              <Input {...register('city')} placeholder="Wien" />
             </div>
           </CardContent>
         </Card>
@@ -140,8 +131,8 @@ export function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>UID-Nummer (Österreich: ATUxxxxxxxx)</Label>
-              <Input {...register('taxId')} placeholder="ATU12345678" />
+              <Label>UID-Nummer / Steuernummer</Label>
+              <Input {...register('taxId')} placeholder="ATU12345678 oder DE123456789" />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-2">

@@ -2,7 +2,7 @@ import { apiClient } from './client';
 
 export interface TenantSettings {
   id: string; name: string; email: string; phone?: string;
-  address?: string; city?: string; country: string;
+  address?: string; city?: string;
   taxId?: string; taxRate: number; invoicePrefix: string;
   invoiceCounter: number; plan: string; logoUrl?: string;
 }

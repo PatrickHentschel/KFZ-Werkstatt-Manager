@@ -14,7 +14,7 @@ export function DashboardPage() {
 
   const { data: orders } = useQuery({
     queryKey: ['orders', 'recent'],
-    queryFn: () => ordersApi.list({ pageSize: 5 }),
+    queryFn: () => ordersApi.list({ pageSize: 5, statuses: 'open,in_progress,waiting_parts,done' }),
   });
 
   const { data: openOrders } = useQuery({
@@ -24,7 +24,7 @@ export function DashboardPage() {
 
   const { data: invoices } = useQuery({
     queryKey: ['invoices', 'recent'],
-    queryFn: () => invoicesApi.list({ pageSize: 5 }),
+    queryFn: () => invoicesApi.list({ pageSize: 5, statuses: 'draft,sent' }),
   });
 
   const orderStatusColor: Record<string, string> = {

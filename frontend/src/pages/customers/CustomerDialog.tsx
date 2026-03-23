@@ -22,7 +22,6 @@ const schema = z.object({
   address: z.string().optional(),
   city: z.string().optional(),
   postalCode: z.string().optional(),
-  country: z.string().default('AT'),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -38,7 +37,7 @@ export function CustomerDialog({ open, onClose, customer }: Props) {
 
   const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { type: 'private', country: 'AT' },
+    defaultValues: { type: 'private' },
   });
 
   const customerType = watch('type');
@@ -55,10 +54,9 @@ export function CustomerDialog({ open, onClose, customer }: Props) {
         address: customer.address || '',
         city: customer.city || '',
         postalCode: customer.postalCode || '',
-        country: customer.country || 'AT',
       });
     } else {
-      reset({ type: 'private', country: 'AT' });
+      reset({ type: 'private' });
     }
   }, [customer, open]);
 

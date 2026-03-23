@@ -9,7 +9,7 @@ export const tenants = pgTable('tenants', {
   phone: varchar('phone', { length: 50 }),
   address: text('address'),
   city: varchar('city', { length: 100 }),
-  country: varchar('country', { length: 2 }).notNull().default('AT'),
+  country: varchar('country', { length: 2 }).notNull().default('DE'),
   taxId: varchar('tax_id', { length: 50 }),
   taxRate: decimal('tax_rate', { precision: 5, scale: 2 }).notNull().default('20.00'),
   invoicePrefix: varchar('invoice_prefix', { length: 20 }).notNull().default('RE'),

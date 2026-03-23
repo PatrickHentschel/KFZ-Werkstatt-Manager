@@ -14,7 +14,6 @@ type InvoiceForPdf = {
     address?: string | null;
     city?: string | null;
     postalCode?: string | null;
-    country?: string;
   };
   items: Array<{
     description: string;
@@ -55,9 +54,6 @@ export async function generateInvoicePdf(invoice: InvoiceForPdf, tenant: Tenant)
     if (invoice.customer.address) doc.text(invoice.customer.address, 350, undefined!, { width: 200 });
     const cityLine = [invoice.customer.postalCode, invoice.customer.city].filter(Boolean).join(' ');
     if (cityLine) doc.text(cityLine, 350, undefined!, { width: 200 });
-    if (invoice.customer.country && invoice.customer.country !== 'AT') {
-      doc.text(invoice.customer.country, 350, undefined!, { width: 200 });
-    }
 
     // Invoice header
     doc.moveDown(3);

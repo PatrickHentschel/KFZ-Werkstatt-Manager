@@ -27,4 +27,6 @@ export const partsApi = {
     apiClient.patch(`/parts/${id}/stock`, { adjustment, reason }),
   listVendors: () => apiClient.get<PaginatedResponse<Vendor>>('/parts/vendors'),
   createVendor: (data: Partial<Vendor>) => apiClient.post<Vendor>('/parts/vendors', data),
+  updateVendor: (id: string, data: Partial<Vendor>) => apiClient.patch<Vendor>(`/parts/vendors/${id}`, data),
+  deleteVendor: (id: string) => apiClient.delete(`/parts/vendors/${id}`),
 };

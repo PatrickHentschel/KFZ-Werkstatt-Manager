@@ -16,7 +16,7 @@ export const customers = pgTable('customers', {
   address: text('address'),
   city: varchar('city', { length: 100 }),
   postalCode: varchar('postal_code', { length: 20 }),
-  country: varchar('country', { length: 2 }).notNull().default('AT'),
+  country: varchar('country', { length: 2 }).notNull().default('DE'),
   taxId: varchar('tax_id', { length: 50 }),
   notes: text('notes'),
   portalToken: varchar('portal_token', { length: 255 }),

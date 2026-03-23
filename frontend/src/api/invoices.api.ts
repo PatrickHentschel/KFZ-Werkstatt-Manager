@@ -20,7 +20,7 @@ export interface Invoice {
 }
 
 export const invoicesApi = {
-  list: (params?: { page?: number; pageSize?: number; status?: string; search?: string }) =>
+  list: (params?: { page?: number; pageSize?: number; status?: string; statuses?: string; search?: string }) =>
     apiClient.get<PaginatedResponse<Invoice>>('/invoices', { params }),
   getById: (id: string) => apiClient.get<Invoice>(`/invoices/${id}`),
   create: (data: Partial<Invoice> & { items: Omit<InvoiceItem, 'id' | 'invoiceId'>[] }) =>

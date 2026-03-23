@@ -15,11 +15,16 @@ const STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
 };
 
 export class OrdersService {
-  async list(tenantId: string, query: { page?: number; pageSize?: number; status?: string; search?: string }) {
+  async list(tenantId: string, query: { page?: number; pageSize?: number; status?: string; statuses?: string[]; search?: string }) {
     const { page, pageSize, offset, limit } = getPaginationParams(query);
     const conditions = [eq(orders.tenantId, tenantId)];
 
-    if (query.status) {
+    const statusList = query.statuses
+      ? (Array.isArray(query.statuses) ? query.statuses : String(query.statuses).split(','))
+      : null;
+    if (statusList && statusList.length > 0) {
+      conditions.push(inArray(orders.status, statusList as OrderStatus[]));
+    } else if (query.status) {
       conditions.push(eq(orders.status, query.status as OrderStatus));
     }
 

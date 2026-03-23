@@ -15,6 +15,13 @@
       "when": 1774000775826,
       "tag": "0001_early_black_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1774268337651,
+      "tag": "0002_lonely_lorna_dane",
+      "breakpoints": true
     }
   ]
 }

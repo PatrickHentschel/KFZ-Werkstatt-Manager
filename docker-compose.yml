@@ -42,6 +42,9 @@ services:
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
       PORT: 3000
       FRONTEND_URL: http://localhost:5273
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      GOOGLE_REDIRECT_URI: http://localhost:3009/api/v1/appointments/auth/google/callback
     ports:
       - "3009:3000"
     volumes:

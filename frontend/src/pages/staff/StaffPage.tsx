@@ -1,16 +1,14 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Play, Square, Pencil } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Plus, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { staffApi, type StaffMember } from '@/api/staff.api';
-import { toast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
 import { StaffDialog } from './StaffDialog';
 
 export function StaffPage() {
-  const queryClient = useQueryClient();
   const [page] = useState(1);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editMember, setEditMember] = useState<StaffMember | null>(null);
@@ -18,24 +16,6 @@ export function StaffPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['staff', { page }],
     queryFn: () => staffApi.list({ page, pageSize: 20 }),
-  });
-
-  const startTimerMutation = useMutation({
-    mutationFn: (id: string) => staffApi.startTimer(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['staff'] });
-      toast({ title: 'Timer gestartet' });
-    },
-    onError: (err: any) =>
-      toast({ variant: 'destructive', title: 'Fehler', description: err.response?.data?.message }),
-  });
-
-  const stopTimerMutation = useMutation({
-    mutationFn: (id: string) => staffApi.stopTimer(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['staff'] });
-      toast({ title: 'Timer gestoppt' });
-    },
   });
 
   return (
@@ -92,25 +72,6 @@ export function StaffPage() {
                 >
                   <Pencil className="mr-1 h-3 w-3" /> Bearbeiten
                 </Button>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => startTimerMutation.mutate(member.id)}
-                    disabled={startTimerMutation.isPending}
-                  >
-                    <Play className="mr-1 h-3 w-3" /> Timer starten
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => stopTimerMutation.mutate(member.id)}
-                    disabled={stopTimerMutation.isPending}
-                  >
-                    <Square className="h-3 w-3" />
-                  </Button>
-                </div>
               </CardContent>
             </Card>
           ))

@@ -10,7 +10,14 @@ export class InvoicesService {
   async list(tenantId: string, query: any) {
     const { page, pageSize, offset, limit } = getPaginationParams(query);
     const conditions = [eq(invoices.tenantId, tenantId)];
-    if (query.status) conditions.push(eq(invoices.status, query.status as InvoiceStatus));
+    const statusList = query.statuses
+      ? (Array.isArray(query.statuses) ? query.statuses : String(query.statuses).split(','))
+      : null;
+    if (statusList && statusList.length > 0) {
+      conditions.push(inArray(invoices.status, statusList as InvoiceStatus[]));
+    } else if (query.status) {
+      conditions.push(eq(invoices.status, query.status as InvoiceStatus));
+    }
     if (query.search) {
       const s = `%${query.search}%`;
       const matchingCustomerIds = db
