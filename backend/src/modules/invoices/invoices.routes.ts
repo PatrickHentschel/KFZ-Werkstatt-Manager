@@ -45,19 +45,25 @@ const invoicesRoutes: FastifyPluginAsync = async (fastify) => {
     return invoicesService.getById(request.user.tenantId, id);
   });
 
-  fastify.post('/', async (request, reply) => {
+  fastify.post('/', {
+    preHandler: [fastify.requireRole('owner', 'admin')],
+  }, async (request, reply) => {
     const body = createInvoiceSchema.parse(request.body);
     const invoice = await invoicesService.create(request.user.tenantId, body);
     return reply.code(201).send(invoice);
   });
 
-  fastify.patch('/:id', async (request) => {
+  fastify.patch('/:id', {
+    preHandler: [fastify.requireRole('owner', 'admin')],
+  }, async (request) => {
     const { id } = request.params as { id: string };
     const body = updateInvoiceSchema.parse(request.body);
     return invoicesService.update(request.user.tenantId, id, body);
   });
 
-  fastify.patch('/:id/status', async (request) => {
+  fastify.patch('/:id/status', {
+    preHandler: [fastify.requireRole('owner', 'admin')],
+  }, async (request) => {
     const { id } = request.params as { id: string };
     const { status } = z.object({ status: z.enum(['draft', 'sent', 'paid', 'cancelled']) }).parse(request.body);
     return invoicesService.updateStatus(request.user.tenantId, id, status);

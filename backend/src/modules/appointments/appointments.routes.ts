@@ -101,7 +101,7 @@ const appointmentsRoutes: FastifyPluginAsync = async (fastify) => {
 
   // Create event
   fastify.post('/', {
-    preHandler: [fastify.authenticate],
+    preHandler: [fastify.authenticate, fastify.requireRole('owner', 'admin', 'reception')],
   }, async (request, reply) => {
     const body = createEventSchema.parse(request.body);
     const event = await googleCalendarService.createEvent(request.user.tenantId, body);
@@ -110,7 +110,7 @@ const appointmentsRoutes: FastifyPluginAsync = async (fastify) => {
 
   // Update event
   fastify.patch('/:eventId', {
-    preHandler: [fastify.authenticate],
+    preHandler: [fastify.authenticate, fastify.requireRole('owner', 'admin', 'reception')],
   }, async (request) => {
     const { eventId } = request.params as { eventId: string };
     const body = createEventSchema.partial().parse(request.body);
@@ -119,7 +119,7 @@ const appointmentsRoutes: FastifyPluginAsync = async (fastify) => {
 
   // Delete event
   fastify.delete('/:eventId', {
-    preHandler: [fastify.authenticate],
+    preHandler: [fastify.authenticate, fastify.requireRole('owner', 'admin', 'reception')],
   }, async (request, reply) => {
     const { eventId } = request.params as { eventId: string };
     await googleCalendarService.deleteEvent(request.user.tenantId, eventId);
