@@ -1,5 +1,6 @@
 import { Menu, LogOut, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { useUIStore } from '@/store/ui.store';
 import { useAuthStore } from '@/store/auth.store';
@@ -9,11 +10,13 @@ export function Header() {
   const { toggleSidebar } = useUIStore();
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const handleLogout = async () => {
     try {
       await authApi.logout();
     } finally {
+      queryClient.clear();
       logout();
       navigate('/login');
     }

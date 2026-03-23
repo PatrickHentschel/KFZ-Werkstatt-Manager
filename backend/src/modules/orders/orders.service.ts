@@ -33,11 +33,17 @@ export class OrdersService {
       const matchingCustomerIds = db
         .select({ id: customers.id })
         .from(customers)
-        .where(or(ilike(customers.firstName, s), ilike(customers.lastName, s), ilike(customers.companyName, s)));
+        .where(and(
+          eq(customers.tenantId, tenantId),
+          or(ilike(customers.firstName, s), ilike(customers.lastName, s), ilike(customers.companyName, s))
+        ));
       const matchingVehicleIds = db
         .select({ id: vehicles.id })
         .from(vehicles)
-        .where(or(ilike(vehicles.licensePlate, s), ilike(vehicles.make, s), ilike(vehicles.model, s)));
+        .where(and(
+          eq(vehicles.tenantId, tenantId),
+          or(ilike(vehicles.licensePlate, s), ilike(vehicles.make, s), ilike(vehicles.model, s))
+        ));
       conditions.push(or(
         ilike(orders.orderNumber, s),
         inArray(orders.customerId, matchingCustomerIds),

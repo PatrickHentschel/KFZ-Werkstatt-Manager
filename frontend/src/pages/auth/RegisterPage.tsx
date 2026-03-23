@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Wrench, Loader2 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -27,6 +28,7 @@ type RegisterForm = z.infer<typeof registerSchema>;
 export function RegisterPage() {
   const navigate = useNavigate();
   const { login } = useAuthStore();
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
 
   const { register, handleSubmit, formState: { errors } } = useForm<RegisterForm>({
@@ -41,6 +43,7 @@ export function RegisterPage() {
         email: data.email,
         password: data.password,
       });
+      queryClient.clear();
       login(response.data.accessToken, response.data.user as any);
       navigate('/dashboard');
     } catch (err: any) {

@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Wrench, Loader2 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,6 +23,7 @@ type LoginForm = z.infer<typeof loginSchema>;
 export function LoginPage() {
   const navigate = useNavigate();
   const { login } = useAuthStore();
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
 
   const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>({
@@ -32,6 +34,7 @@ export function LoginPage() {
     setLoading(true);
     try {
       const response = await authApi.login(data);
+      queryClient.clear();
       login(response.data.accessToken, response.data.user as any);
       navigate('/dashboard');
     } catch (err: any) {
