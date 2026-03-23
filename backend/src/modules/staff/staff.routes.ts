@@ -14,6 +14,7 @@ const createStaffSchema = z.object({
 
 const staffRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('preHandler', fastify.authenticate);
+  fastify.addHook('preHandler', fastify.requireRole('owner', 'admin'));
 
   fastify.get('/', async (request) => staffService.list(request.user.tenantId, request.query));
   fastify.get('/:id', async (request) => staffService.getById(request.user.tenantId, (request.params as any).id));
