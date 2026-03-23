@@ -1,4 +1,5 @@
 import { FastifyPluginAsync } from 'fastify';
+import { z } from 'zod';
 import { staffService } from './staff.service';
 
 const createStaffSchema = z.object({
