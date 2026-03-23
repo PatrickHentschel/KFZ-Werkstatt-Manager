@@ -24,7 +24,9 @@ const partsRoutes: FastifyPluginAsync = async (fastify) => {
   // Parts
   fastify.get('/', async (request) => partsService.list(request.user.tenantId, request.query as any));
   fastify.get('/:id', async (request) => partsService.getById(request.user.tenantId, (request.params as any).id));
-  fastify.post('/', async (request, reply) => {
+  fastify.post('/', {
+    preHandler: [fastify.requireRole('owner', 'admin')],
+  }, async (request, reply) => {
     const body = createPartSchema.parse(request.body);
     const part = await partsService.create(request.user.tenantId, {
       ...body,
@@ -36,22 +38,30 @@ const partsRoutes: FastifyPluginAsync = async (fastify) => {
     } as any);
     return reply.code(201).send(part);
   });
-  fastify.patch('/:id', async (request) => {
+  fastify.patch('/:id', {
+    preHandler: [fastify.requireRole('owner', 'admin')],
+  }, async (request) => {
     const body = createPartSchema.partial().parse(request.body);
     return partsService.update(request.user.tenantId, (request.params as any).id, body as any);
   });
-  fastify.delete('/:id', async (request, reply) => {
+  fastify.delete('/:id', {
+    preHandler: [fastify.requireRole('owner', 'admin')],
+  }, async (request, reply) => {
     await partsService.delete(request.user.tenantId, (request.params as any).id);
     return reply.code(204).send();
   });
-  fastify.patch('/:id/stock', async (request) => {
+  fastify.patch('/:id/stock', {
+    preHandler: [fastify.requireRole('owner', 'admin')],
+  }, async (request) => {
     const { adjustment, reason } = z.object({ adjustment: z.number(), reason: z.string().optional() }).parse(request.body);
     return partsService.adjustStock(request.user.tenantId, (request.params as any).id, adjustment, reason);
   });
 
   // Vendors
   fastify.get('/vendors', async (request) => vendorsService.list(request.user.tenantId, request.query as any));
-  fastify.post('/vendors', async (request, reply) => {
+  fastify.post('/vendors', {
+    preHandler: [fastify.requireRole('owner', 'admin')],
+  }, async (request, reply) => {
     const body = z.object({
       name: z.string().min(1),
       email: z.string().email().optional(),
@@ -63,11 +73,15 @@ const partsRoutes: FastifyPluginAsync = async (fastify) => {
     const vendor = await vendorsService.create(request.user.tenantId, body as any);
     return reply.code(201).send(vendor);
   });
-  fastify.patch('/vendors/:id', async (request) => {
+  fastify.patch('/vendors/:id', {
+    preHandler: [fastify.requireRole('owner', 'admin')],
+  }, async (request) => {
     const body = z.object({ name: z.string().optional(), email: z.string().optional(), phone: z.string().optional() }).parse(request.body);
     return vendorsService.update(request.user.tenantId, (request.params as any).id, body as any);
   });
-  fastify.delete('/vendors/:id', async (request, reply) => {
+  fastify.delete('/vendors/:id', {
+    preHandler: [fastify.requireRole('owner', 'admin')],
+  }, async (request, reply) => {
     await vendorsService.delete(request.user.tenantId, (request.params as any).id);
     return reply.code(204).send();
   });
