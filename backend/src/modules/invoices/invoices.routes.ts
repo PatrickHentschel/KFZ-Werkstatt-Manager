@@ -4,7 +4,9 @@ import { eq } from 'drizzle-orm';
 import { invoicesService } from './invoices.service';
 import { db } from '../../db';
 import { tenants } from '../../db/schema/tenants';
+import { customers } from '../../db/schema/customers';
 import { generateInvoicePdf } from '../../utils/pdf';
+import { sendEmail } from '../../utils/email';
 
 const invoiceItemSchema = z.object({
   description: z.string(),
@@ -67,6 +69,51 @@ const invoicesRoutes: FastifyPluginAsync = async (fastify) => {
     const { id } = request.params as { id: string };
     const { status } = z.object({ status: z.enum(['draft', 'sent', 'paid', 'cancelled']) }).parse(request.body);
     return invoicesService.updateStatus(request.user.tenantId, id, status);
+  });
+
+  fastify.post('/:id/send', {
+    preHandler: [fastify.requireRole('owner', 'admin')],
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const tenantId = request.user.tenantId;
+
+    const invoice = await invoicesService.getById(tenantId, id);
+    const tenant = await db.query.tenants.findFirst({ where: eq(tenants.id, tenantId) });
+    const customer = await db.query.customers.findFirst({ where: eq(customers.id, invoice.customerId) });
+
+    if (!customer?.email) {
+      return reply.code(422).send({ statusCode: 422, error: 'Unprocessable Entity', message: 'Customer has no email address' });
+    }
+
+    const pdfBuffer = await generateInvoicePdf(invoice, tenant!);
+    const customerName = customer.type === 'business'
+      ? (customer.companyName || `${customer.firstName} ${customer.lastName}`)
+      : `${customer.firstName || ''} ${customer.lastName || ''}`.trim();
+
+    await sendEmail({
+      to: customer.email,
+      subject: `Ihre Rechnung ${invoice.invoiceNumber} von ${tenant!.name}`,
+      html: `
+        <p>Sehr geehrte/r ${customerName},</p>
+        <p>im Anhang finden Sie Ihre Rechnung <strong>${invoice.invoiceNumber}</strong>.</p>
+        ${invoice.dueDate ? `<p>Zahlbar bis: ${new Date(invoice.dueDate).toLocaleDateString('de-AT')}</p>` : ''}
+        <p>Bei Fragen stehen wir Ihnen gerne zur Verfügung.</p>
+        <p>Mit freundlichen Grüßen,<br>${tenant!.name}</p>
+      `,
+      attachments: [
+        {
+          filename: `${invoice.invoiceNumber}.pdf`,
+          content: pdfBuffer,
+          contentType: 'application/pdf',
+        },
+      ],
+    });
+
+    if (invoice.status === 'draft') {
+      await invoicesService.updateStatus(tenantId, id, 'sent');
+    }
+
+    return reply.code(204).send();
   });
 
   fastify.get('/:id/pdf', async (request, reply) => {

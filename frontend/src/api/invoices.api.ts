@@ -30,4 +30,5 @@ export const invoicesApi = {
   updateStatus: (id: string, status: InvoiceStatus) =>
     apiClient.patch<Invoice>(`/invoices/${id}/status`, { status }),
   getPdf: (id: string) => apiClient.get(`/invoices/${id}/pdf`, { responseType: 'blob' }),
+  send: (id: string) => apiClient.post(`/invoices/${id}/send`),
 };

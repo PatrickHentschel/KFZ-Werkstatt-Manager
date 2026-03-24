@@ -15,6 +15,7 @@ import partsRoutes from './modules/parts/parts.routes';
 import staffRoutes from './modules/staff/staff.routes';
 import reportsRoutes from './modules/reports/reports.routes';
 import settingsRoutes from './modules/settings/settings.routes';
+import dashboardRoutes from './modules/dashboard/dashboard.routes';
 import { db } from './db';
 import { AppError } from './utils/errors';
 
@@ -27,7 +28,7 @@ declare module 'fastify' {
 export async function buildApp(): Promise<FastifyInstance> {
   const fastify = Fastify({
     logger: {
-      level: process.env.NODE_ENV === 'production' ? 'warn' : 'info',
+      level: process.env.LOG_LEVEL || 'info',
     },
   });
 
@@ -61,6 +62,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(staffRoutes, { prefix: '/api/v1/staff' });
   await fastify.register(reportsRoutes, { prefix: '/api/v1/reports' });
   await fastify.register(settingsRoutes, { prefix: '/api/v1/settings' });
+  await fastify.register(dashboardRoutes, { prefix: '/api/v1/dashboard' });
 
   // Health check
   fastify.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));
@@ -92,7 +94,7 @@ export async function buildApp(): Promise<FastifyInstance> {
       });
     }
 
-    fastify.log.error(error);
+    fastify.log.error({ err: error, stack: error.stack, reqId: request.id }, 'Unhandled error');
     return reply.code(500).send({
       statusCode: 500,
       error: 'Internal Server Error',

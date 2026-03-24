@@ -1,47 +1,43 @@
 import { useQuery } from '@tanstack/react-query';
-import { ClipboardList, Users, FileText, TrendingUp } from 'lucide-react';
+import { ClipboardList, Users, AlertTriangle, TrendingUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { customersApi } from '@/api/customers.api';
-import { ordersApi } from '@/api/orders.api';
-import { invoicesApi } from '@/api/invoices.api';
+import { dashboardApi } from '@/api/dashboard.api';
+
+const orderStatusColor: Record<string, string> = {
+  open: 'secondary',
+  in_progress: 'default',
+  waiting_parts: 'warning',
+  done: 'success',
+  invoiced: 'outline',
+};
+
+const orderStatusLabel: Record<string, string> = {
+  open: 'Offen',
+  in_progress: 'In Bearbeitung',
+  waiting_parts: 'Warte auf Teile',
+  done: 'Fertig',
+  invoiced: 'Verrechnet',
+};
+
+const invoiceStatusLabel: Record<string, string> = {
+  draft: 'Entwurf', sent: 'Versendet', paid: 'Bezahlt', cancelled: 'Storniert',
+};
+
+const invoiceStatusVariant: Record<string, string> = {
+  draft: 'secondary', sent: 'default', paid: 'success', cancelled: 'destructive',
+};
+
+const formatEur = (amount: number) =>
+  new Intl.NumberFormat('de-AT', { style: 'currency', currency: 'EUR' }).format(amount);
 
 export function DashboardPage() {
-  const { data: customers } = useQuery({
-    queryKey: ['customers', 'count'],
-    queryFn: () => customersApi.list({ pageSize: 1 }),
+  const { data } = useQuery({
+    queryKey: ['dashboard', 'stats'],
+    queryFn: () => dashboardApi.getStats(),
   });
 
-  const { data: orders } = useQuery({
-    queryKey: ['orders', 'recent'],
-    queryFn: () => ordersApi.list({ pageSize: 5, statuses: 'open,in_progress,waiting_parts,done' }),
-  });
-
-  const { data: openOrders } = useQuery({
-    queryKey: ['orders', 'open'],
-    queryFn: () => ordersApi.list({ pageSize: 1, status: 'open' }),
-  });
-
-  const { data: invoices } = useQuery({
-    queryKey: ['invoices', 'recent'],
-    queryFn: () => invoicesApi.list({ pageSize: 5, statuses: 'draft,sent' }),
-  });
-
-  const orderStatusColor: Record<string, string> = {
-    open: 'secondary',
-    in_progress: 'default',
-    waiting_parts: 'warning',
-    done: 'success',
-    invoiced: 'outline',
-  };
-
-  const orderStatusLabel: Record<string, string> = {
-    open: 'Offen',
-    in_progress: 'In Bearbeitung',
-    waiting_parts: 'Warte auf Teile',
-    done: 'Fertig',
-    invoiced: 'Verrechnet',
-  };
+  const stats = data?.data;
 
   return (
     <div className="space-y-6">
@@ -55,7 +51,7 @@ export function DashboardPage() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{customers?.data.total || 0}</div>
+            <div className="text-2xl font-bold">{stats?.totalCustomers ?? '—'}</div>
             <p className="text-xs text-muted-foreground">Gesamt</p>
           </CardContent>
         </Card>
@@ -66,30 +62,38 @@ export function DashboardPage() {
             <ClipboardList className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{openOrders?.data.total || 0}</div>
-            <p className="text-xs text-muted-foreground">Aktiv</p>
+            <div className="text-2xl font-bold">{stats?.openOrders ?? '—'}</div>
+            <p className="text-xs text-muted-foreground">
+              {stats?.ordersCompletedThisMonth ?? 0} diesen Monat fertig
+            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Aufträge gesamt</CardTitle>
+            <CardTitle className="text-sm font-medium">Umsatz diesen Monat</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{orders?.data.total || 0}</div>
-            <p className="text-xs text-muted-foreground">Alle Status</p>
+            <div className="text-2xl font-bold">
+              {stats !== undefined ? formatEur(stats.revenueThisMonth) : '—'}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Vormonat: {stats !== undefined ? formatEur(stats.revenueLastMonth) : '—'}
+            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Rechnungen</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Überfällige Rechnungen</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{invoices?.data.total || 0}</div>
-            <p className="text-xs text-muted-foreground">Gesamt</p>
+            <div className={`text-2xl font-bold ${(stats?.overdueInvoices ?? 0) > 0 ? 'text-destructive' : ''}`}>
+              {stats?.overdueInvoices ?? '—'}
+            </div>
+            <p className="text-xs text-muted-foreground">Zahlungsziel überschritten</p>
           </CardContent>
         </Card>
       </div>
@@ -102,10 +106,10 @@ export function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {orders?.data.data.length === 0 && (
+              {stats?.recentOrders.length === 0 && (
                 <p className="text-sm text-muted-foreground">Keine Aufträge vorhanden</p>
               )}
-              {orders?.data.data.map((order) => (
+              {stats?.recentOrders.map((order) => (
                 <div key={order.id} className="flex items-center justify-between rounded-lg border p-3">
                   <div>
                     <p className="font-medium text-sm">{order.orderNumber}</p>
@@ -129,17 +133,19 @@ export function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {invoices?.data.data.length === 0 && (
+              {stats?.recentInvoices.length === 0 && (
                 <p className="text-sm text-muted-foreground">Keine Rechnungen vorhanden</p>
               )}
-              {invoices?.data.data.map((invoice) => (
+              {stats?.recentInvoices.map((invoice) => (
                 <div key={invoice.id} className="flex items-center justify-between rounded-lg border p-3">
                   <div>
                     <p className="font-medium text-sm">{invoice.invoiceNumber}</p>
-                    <p className="text-xs text-muted-foreground">{invoice.issueDate}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(invoice.issueDate).toLocaleDateString('de-AT')}
+                    </p>
                   </div>
-                  <Badge variant={invoice.status === 'paid' ? 'success' : invoice.status === 'sent' ? 'default' : 'secondary'}>
-                    {invoice.status === 'draft' ? 'Entwurf' : invoice.status === 'sent' ? 'Versendet' : invoice.status === 'paid' ? 'Bezahlt' : 'Storniert'}
+                  <Badge variant={invoiceStatusVariant[invoice.status] as any}>
+                    {invoiceStatusLabel[invoice.status]}
                   </Badge>
                 </div>
               ))}

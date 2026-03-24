@@ -4,6 +4,7 @@ import path from 'path';
 dotenv.config({ path: path.join(__dirname, '../.env') });
 
 import { buildApp } from './app';
+import { startAppointmentReminderJob } from './jobs/appointmentReminders';
 
 async function main() {
   const app = await buildApp();
@@ -13,6 +14,11 @@ async function main() {
 
   await app.listen({ port, host });
   console.log(`Server running on http://${host}:${port}`);
+
+  if (process.env.SMTP_HOST) {
+    startAppointmentReminderJob();
+    app.log.info('Appointment reminder job started');
+  }
 }
 
 main().catch((err) => {

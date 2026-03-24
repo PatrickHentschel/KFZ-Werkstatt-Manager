@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, FileDown, Pencil, Search } from 'lucide-react';
+import { Plus, FileDown, Pencil, Search, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -66,6 +66,18 @@ export function InvoicesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       toast({ title: 'Als bezahlt markiert' });
+    },
+  });
+
+  const sendInvoice = useMutation({
+    mutationFn: (id: string) => invoicesApi.send(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      toast({ title: 'Rechnung per E-Mail versendet' });
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.message || 'E-Mail konnte nicht gesendet werden';
+      toast({ variant: 'destructive', title: msg });
     },
   });
 
@@ -153,6 +165,17 @@ export function InvoicesPage() {
                             onClick={() => markSent.mutate(inv.id)}
                           >
                             Versenden
+                          </Button>
+                        )}
+                        {(inv.status === 'draft' || inv.status === 'sent') && (
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            title="Per E-Mail senden"
+                            onClick={() => sendInvoice.mutate(inv.id)}
+                            disabled={sendInvoice.isPending}
+                          >
+                            <Send className="h-4 w-4" />
                           </Button>
                         )}
                         {inv.status === 'sent' && (
