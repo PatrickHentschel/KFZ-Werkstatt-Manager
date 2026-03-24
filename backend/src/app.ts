@@ -16,12 +16,12 @@ import staffRoutes from './modules/staff/staff.routes';
 import reportsRoutes from './modules/reports/reports.routes';
 import settingsRoutes from './modules/settings/settings.routes';
 import dashboardRoutes from './modules/dashboard/dashboard.routes';
-import { db } from './db';
+import { db, type DB } from './db';
 import { AppError } from './utils/errors';
 
 declare module 'fastify' {
   interface FastifyInstance {
-    db: typeof db;
+    db: DB;
   }
 }
 
@@ -45,8 +45,8 @@ export async function buildApp(): Promise<FastifyInstance> {
     skipOnError: true,
   });
 
-  // Decorate with db instance
-  fastify.decorate('db', db);
+  // Decorate with db instance (proxy – routes to tenant-scoped DB per request)
+  fastify.decorate('db', db as DB);
 
   // Register auth plugin
   await fastify.register(authPlugin);
