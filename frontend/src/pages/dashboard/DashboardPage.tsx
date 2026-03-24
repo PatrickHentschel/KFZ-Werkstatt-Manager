@@ -32,12 +32,34 @@ const formatEur = (amount: number) =>
   new Intl.NumberFormat('de-AT', { style: 'currency', currency: 'EUR' }).format(amount);
 
 export function DashboardPage() {
-  const { data } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ['dashboard', 'stats'],
     queryFn: () => dashboardApi.getStats(),
   });
 
   const stats = data?.data;
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold">Dashboard</h1>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Card key={i}><CardContent className="h-24 animate-pulse bg-muted rounded-lg" /></Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold">Dashboard</h1>
+        <p className="text-sm text-destructive">Dashboard-Daten konnten nicht geladen werden.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

@@ -8,3 +8,4 @@ export * from './types/appointment';
 export * from './types/parts';
 export * from './types/staff';
 export * from './types/common';
+export * from './types/payment';

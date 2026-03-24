@@ -16,6 +16,8 @@ import { PartsPage } from '@/pages/parts/PartsPage';
 import { StaffPage } from '@/pages/staff/StaffPage';
 import { ReportsPage } from '@/pages/reports/ReportsPage';
 import { SettingsPage } from '@/pages/settings/SettingsPage';
+import { DemoCheckoutPage } from '@/pages/payments/DemoCheckoutPage';
+import { PaymentSuccessPage } from '@/pages/payments/PaymentSuccessPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -34,6 +36,7 @@ export default function App() {
           {/* Public routes */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/demo-checkout" element={<DemoCheckoutPage />} />
 
           {/* Protected routes */}
           <Route path="/" element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
@@ -48,6 +51,7 @@ export default function App() {
             <Route path="staff" element={<StaffPage />} />
             <Route path="reports" element={<ReportsPage />} />
             <Route path="settings" element={<SettingsPage />} />
+            <Route path="payment-success" element={<PaymentSuccessPage />} />
           </Route>
 
           {/* Fallback */}

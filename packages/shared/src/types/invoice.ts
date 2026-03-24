@@ -12,6 +12,9 @@ export interface Invoice {
   issueDate: string;
   dueDate?: string;
   paidAt?: string;
+  stripePaymentIntentId?: string;
+  stripeCheckoutSessionId?: string;
+  paymentMethod?: 'stripe' | 'demo' | 'manual';
   items: InvoiceItem[];
   totalNet: number;
   totalTax: number;

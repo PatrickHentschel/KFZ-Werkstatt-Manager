@@ -33,8 +33,13 @@ function optionalSecret(envVar: string, secretName: string): string | undefined 
 }
 
 export const config = {
-  databaseUrl:      secret('DATABASE_URL', 'database_url'),
-  jwtAccessSecret:  secret('JWT_ACCESS_SECRET', 'jwt_access_secret'),
-  jwtRefreshSecret: secret('JWT_REFRESH_SECRET', 'jwt_refresh_secret'),
-  smtpPass:         optionalSecret('SMTP_PASS', 'smtp_pass'),
+  databaseUrl:          secret('DATABASE_URL', 'database_url'),
+  jwtAccessSecret:      secret('JWT_ACCESS_SECRET', 'jwt_access_secret'),
+  jwtRefreshSecret:     secret('JWT_REFRESH_SECRET', 'jwt_refresh_secret'),
+  smtpPass:             optionalSecret('SMTP_PASS', 'smtp_pass'),
+  stripeSecretKey:      optionalSecret('STRIPE_SECRET_KEY', 'stripe_secret_key'),
+  stripeWebhookSecret:  optionalSecret('STRIPE_WEBHOOK_SECRET', 'stripe_webhook_secret'),
+  stripePublishableKey: optionalSecret('STRIPE_PUBLISHABLE_KEY', 'stripe_publishable_key'),
 };
+
+export const isStripeEnabled = (): boolean => !!config.stripeSecretKey;
