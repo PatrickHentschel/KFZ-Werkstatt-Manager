@@ -29,6 +29,13 @@
       "when": 1742810400000,
       "tag": "0003_tenant_rls",
       "breakpoints": false
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1742896800000,
+      "tag": "0004_stripe_payment_fields",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { CreditCard, Lock, Loader2, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +12,7 @@ import { toast } from '@/hooks/use-toast';
 export function DemoCheckoutPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const invoiceId = searchParams.get('invoice');
   const sessionId = searchParams.get('session');
   const [processing, setProcessing] = useState(false);
@@ -26,6 +28,7 @@ export function DemoCheckoutPage() {
       // Simulate card processing delay
       await new Promise((r) => setTimeout(r, 2000));
       await paymentsApi.confirmDemo(invoiceId, sessionId);
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
       navigate(`/payment-success?invoice=${invoiceId}`);
     } catch {
       toast({ variant: 'destructive', title: 'Zahlung fehlgeschlagen' });
