@@ -3,9 +3,10 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import * as schema from './schema';
+import { config } from '../config';
 
 export const pool = new Pool({
-  connectionString: process.env.DATABASE_URL!,
+  connectionString: config.databaseUrl,
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,

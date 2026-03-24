@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import { config } from '../config';
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
@@ -6,7 +7,7 @@ const transporter = nodemailer.createTransport({
   secure: Number(process.env.SMTP_PORT) === 465,
   auth: {
     user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
+    pass: config.smtpPass,
   },
 });
 

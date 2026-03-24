@@ -33,8 +33,6 @@ services:
       NODE_ENV: production
       LOG_LEVEL: ${LOG_LEVEL:-info}
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       JWT_ACCESS_EXPIRES_IN: ${JWT_ACCESS_EXPIRES_IN:-15m}
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
       PORT: 3000
@@ -42,8 +40,11 @@ services:
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:-}
-      SMTP_PASS: ${SMTP_PASS:-}
       SMTP_FROM: ${SMTP_FROM:-}
+    secrets:
+      - jwt_access_secret
+      - jwt_refresh_secret
+      - smtp_pass
     command: sh -c "npm run db:migrate && node dist/server.js"
     volumes:
       - uploads_data:/app/uploads
@@ -78,6 +79,17 @@ services:
     networks:
       - external
 
+  certbot:
+    image: certbot/certbot
+    container_name: werkstatt_certbot
+    volumes:
+      - certbot_data:/etc/letsencrypt
+      - certbot_webroot:/var/www/certbot
+    # Renews certificates every 12 hours; exits immediately if nothing to renew
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    depends_on:
+      - nginx
+
   backup:
     image: postgres:16-alpine
     profiles: [backup]
@@ -104,3 +116,11 @@ volumes:
   pdfs_data:
   certbot_data:
   certbot_webroot:
+
+secrets:
+  jwt_access_secret:
+    file: ./secrets/jwt_access_secret.txt
+  jwt_refresh_secret:
+    file: ./secrets/jwt_refresh_secret.txt
+  smtp_pass:
+    file: ./secrets/smtp_pass.txt

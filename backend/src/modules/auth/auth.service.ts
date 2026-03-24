@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { db } from '../../db';
 import { users, refreshTokens, tenants } from '../../db/schema';
+import { config } from '../../config';
 import { errors } from '../../utils/errors';
 import { JwtPayload, UserRole } from '@werkstatt/shared';
 
@@ -73,7 +74,7 @@ export class AuthService {
   async refresh(refreshToken: string) {
     let payload: JwtPayload;
     try {
-      payload = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET!) as JwtPayload;
+      payload = jwt.verify(refreshToken, config.jwtRefreshSecret) as JwtPayload;
     } catch {
       throw errors.unauthorized('Invalid refresh token');
     }
@@ -118,11 +119,11 @@ export class AuthService {
   private async generateTokens(userId: string, tenantId: string, role: UserRole, email: string) {
     const payload: JwtPayload = { sub: userId, tenantId, role, email };
 
-    const accessToken = jwt.sign(payload, process.env.JWT_ACCESS_SECRET!, {
+    const accessToken = jwt.sign(payload, config.jwtAccessSecret, {
       expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
     } as jwt.SignOptions);
 
-    const refreshTokenValue = jwt.sign(payload, process.env.JWT_REFRESH_SECRET!, {
+    const refreshTokenValue = jwt.sign(payload, config.jwtRefreshSecret, {
       expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
     } as jwt.SignOptions);
 

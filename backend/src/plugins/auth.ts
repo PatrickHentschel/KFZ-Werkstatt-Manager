@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import type { PoolClient } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { JwtPayload } from '@werkstatt/shared';
+import { config } from '../config';
 import { errors } from '../utils/errors';
 import { pool, tenantDbStore, type DB } from '../db';
 import * as schema from '../db/schema';
@@ -32,7 +33,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
 
     let payload: JwtPayload;
     try {
-      payload = jwt.verify(token, process.env.JWT_ACCESS_SECRET!) as JwtPayload;
+      payload = jwt.verify(token, config.jwtAccessSecret) as JwtPayload;
     } catch {
       return reply.code(401).send({ statusCode: 401, error: 'Unauthorized', message: 'Invalid token' });
     }
