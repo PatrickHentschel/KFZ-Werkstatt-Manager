@@ -9,6 +9,7 @@ import { generateInvoicePdf } from '../../utils/pdf';
 import { sendEmail } from '../../utils/email';
 
 const invoiceItemSchema = z.object({
+  type: z.enum(['labor', 'part', 'misc']).optional(),
   description: z.string(),
   quantity: z.number().positive(),
   unitPrice: z.number().nonnegative(),
