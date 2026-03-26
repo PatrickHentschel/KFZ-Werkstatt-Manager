@@ -138,9 +138,9 @@ export function OrderDetailSheet({ orderId, onClose }: Props) {
       const awRate = Number(entry.staff.awRate || 0);
       const hourlyRate = Number(entry.staff.hourlyRate || 0);
       const useAw = awRate > 0;
-      // 1 AW = 5 minutes (standard KFZ Arbeitswert)
+      const awMinutes = settingsData?.data.awMinutes ?? 5;
       const quantity = useAw
-        ? Math.round(durationMinutes / 5 * 10) / 10
+        ? Math.round(durationMinutes / awMinutes * 10) / 10
         : Math.round(durationMinutes / 60 * 100) / 100;
       const unitPrice = useAw ? awRate : hourlyRate;
       const currentItems = order.items.map((item) => ({
