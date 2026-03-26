@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Save, Building2, FileText } from 'lucide-react';
+import { Save, Building2, FileText, Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,6 +20,7 @@ const schema = z.object({
   taxId: z.string().optional(),
   taxRate: z.number().min(0).max(100),
   invoicePrefix: z.string().max(20),
+  awMinutes: z.number().int().min(1).max(60),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -34,7 +35,7 @@ export function SettingsPage() {
 
   const { register, handleSubmit, reset, formState: { errors, isDirty } } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { taxRate: 20, invoicePrefix: 'RE' },
+    defaultValues: { taxRate: 20, invoicePrefix: 'RE', awMinutes: 5 },
   });
 
   useEffect(() => {
@@ -49,6 +50,7 @@ export function SettingsPage() {
         taxId: s.taxId || '',
         taxRate: Number(s.taxRate),
         invoicePrefix: s.invoicePrefix,
+        awMinutes: s.awMinutes ?? 5,
       });
     }
   }, [data]);
@@ -151,6 +153,37 @@ export function SettingsPage() {
                 <Input {...register('invoicePrefix')} placeholder="RE" maxLength={20} />
                 <p className="text-xs text-muted-foreground">Beispiel: RE-00001</p>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* AW settings */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Wrench className="h-5 w-5" /> Arbeitswert (AW)
+            </CardTitle>
+            <CardDescription>Konfiguration der AW-Einheit für Arbeitspositionen</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Minuten pro AW</Label>
+              <div className="flex items-center gap-3">
+                <Input
+                  type="number"
+                  min="1"
+                  max="60"
+                  step="1"
+                  className="w-28"
+                  {...register('awMinutes', { valueAsNumber: true })}
+                />
+                <span className="text-sm text-muted-foreground">Minuten = 1 AW</span>
+              </div>
+              {errors.awMinutes && <p className="text-xs text-destructive">{errors.awMinutes.message}</p>}
+              <p className="text-xs text-muted-foreground">
+                Standard laut REFA/VDA: 5 min/AW (= 12 AW/Std). Hersteller wie VW, Audi, BMW verwenden 5 min.
+                Einige Werkstätten nutzen 6 min (= 10 AW/Std).
+              </p>
             </div>
           </CardContent>
         </Card>
