@@ -159,9 +159,6 @@ export function InvoiceDialog({ open, onClose, invoice }: Props) {
     if (staff.awRate) {
       setValue(`items.${idx}.unitPrice`, staff.awRate);
       setValue(`items.${idx}.unit`, 'AW');
-    } else if (staff.hourlyRate) {
-      setValue(`items.${idx}.unitPrice`, staff.hourlyRate);
-      setValue(`items.${idx}.unit`, 'Std');
     }
   };
 
@@ -618,8 +615,8 @@ export function InvoiceDialog({ open, onClose, invoice }: Props) {
                     replace(
                       [...selectedOrderData.data.items]
                         .sort((a, b) => a.sortOrder - b.sortOrder)
-                        .map(({ type, description, quantity, unitPrice, taxRate }) => ({
-                          type, description, quantity, unitPrice, taxRate,
+                        .map(({ type, description, quantity, unitPrice, taxRate, unit }) => ({
+                          type, description, quantity, unitPrice, taxRate, unit: unit || undefined,
                         }))
                     );
                   }

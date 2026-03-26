@@ -178,9 +178,6 @@ export function OrderDialog({ open, onClose }: Props) {
     if (staff.awRate) {
       setValue(`items.${idx}.unitPrice`, staff.awRate);
       setValue(`items.${idx}.unit`, 'AW');
-    } else if (staff.hourlyRate) {
-      setValue(`items.${idx}.unitPrice`, staff.hourlyRate);
-      setValue(`items.${idx}.unit`, 'Std');
     }
   };
 
