@@ -62,7 +62,7 @@ export class InvoicesService {
     issueDate: string;
     dueDate?: string;
     notes?: string;
-    items: Array<{ description: string; quantity: number; unitPrice: number; taxRate: number; unit?: string; sortOrder?: number }>;
+    items: Array<{ type?: 'labor' | 'part' | 'misc'; description: string; quantity: number; unitPrice: number; taxRate: number; unit?: string; sortOrder?: number }>;
   }) {
     // Generate invoice number
     const [tenant] = await db.update(tenants)
@@ -87,6 +87,7 @@ export class InvoicesService {
       await db.insert(invoiceItems).values(
         data.items.map((item, idx) => ({
           invoiceId: invoice.id,
+          type: item.type ?? 'misc',
           description: item.description,
           quantity: String(item.quantity),
           unitPrice: String(item.unitPrice),
@@ -118,6 +119,7 @@ export class InvoicesService {
       issueDate: today,
       dueDate: dueDate.toISOString().split('T')[0],
       items: order.items.map(item => ({
+        type: item.type,
         description: item.description,
         quantity: Number(item.quantity),
         unitPrice: Number(item.unitPrice),

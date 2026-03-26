@@ -1,7 +1,7 @@
 import { pgTable, uuid, varchar, decimal, text, timestamp, pgEnum, date, integer } from 'drizzle-orm/pg-core';
 import { tenants } from './tenants';
 import { customers } from './customers';
-import { orders } from './orders';
+import { orders, orderItemTypeEnum } from './orders';
 
 export const invoiceStatusEnum = pgEnum('invoice_status', ['draft', 'sent', 'paid', 'cancelled']);
 export const invoiceTypeEnum = pgEnum('invoice_type', ['invoice', 'quote', 'credit_note']);
@@ -29,6 +29,7 @@ export const invoices = pgTable('invoices', {
 export const invoiceItems = pgTable('invoice_items', {
   id: uuid('id').defaultRandom().primaryKey(),
   invoiceId: uuid('invoice_id').notNull().references(() => invoices.id, { onDelete: 'cascade' }),
+  type: orderItemTypeEnum('type').notNull().default('misc'),
   description: text('description').notNull(),
   quantity: decimal('quantity', { precision: 10, scale: 2 }).notNull().default('1'),
   unitPrice: decimal('unit_price', { precision: 10, scale: 2 }).notNull(),
