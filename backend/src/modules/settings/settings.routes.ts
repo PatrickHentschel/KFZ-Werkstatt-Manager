@@ -43,6 +43,7 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
     if (body.taxId !== undefined) updates.taxId = body.taxId;
     if (body.taxRate !== undefined) updates.taxRate = String(body.taxRate);
     if (body.invoicePrefix) updates.invoicePrefix = body.invoicePrefix;
+    if (body.awMinutes !== undefined) updates.awMinutes = body.awMinutes;
 
     const [updated] = await db.update(tenants)
       .set(updates)
