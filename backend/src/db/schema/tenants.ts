@@ -14,6 +14,7 @@ export const tenants = pgTable('tenants', {
   taxRate: decimal('tax_rate', { precision: 5, scale: 2 }).notNull().default('20.00'),
   invoicePrefix: varchar('invoice_prefix', { length: 20 }).notNull().default('RE'),
   invoiceCounter: integer('invoice_counter').notNull().default(1),
+  awMinutes: integer('aw_minutes').notNull().default(5),
   plan: tenantPlanEnum('plan').notNull().default('trial'),
   logoUrl: text('logo_url'),
   googleClientId: varchar('google_client_id', { length: 255 }),
