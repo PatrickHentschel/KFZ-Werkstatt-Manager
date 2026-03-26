@@ -132,6 +132,13 @@ export function InvoiceDialog({ open, onClose, invoice }: Props) {
     enabled: step === 2 && !!selectedCustomer,
   });
 
+  // Re-apply orderId once orders load — native <select> can't select an option that doesn't exist yet
+  useEffect(() => {
+    if (invoice?.orderId && ordersData) {
+      setValue('orderId', invoice.orderId);
+    }
+  }, [ordersData, invoice?.orderId, setValue]);
+
   const { data: partsData } = useQuery({
     queryKey: ['parts', { search: debouncedPartSearch }],
     queryFn: () => partsApi.list({ search: debouncedPartSearch, pageSize: 20 }),
