@@ -11,10 +11,9 @@ const createVehicleSchema = z.object({
   year: z.number().int().min(1900).max(2100).optional(),
   color: z.string().optional(),
   engineDisplacement: z.number().int().optional(),
-  fuelType: z.enum(['gasoline', 'diesel', 'electric', 'hybrid', 'lpg', 'cng', 'other']).optional(),
+  fuelType: z.enum(['benzin', 'diesel', 'elektro', 'hybrid', 'lpg', 'cng', 'sonstige']).optional(),
   mileage: z.number().int().optional(),
   nextTuvDate: z.string().optional(),
-  nextPickerlDate: z.string().optional(),
   notes: z.string().optional(),
 });
 

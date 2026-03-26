@@ -26,7 +26,6 @@ const schema = z.object({
   fuelType: z.string().optional(),
   mileage: z.preprocess(nanToUndefined, z.number().int().nonnegative().optional()),
   nextTuvDate: z.string().optional(),
-  nextPickerlDate: z.string().optional(),
   notes: z.string().optional(),
 });
 
@@ -67,7 +66,6 @@ export function VehicleDialog({ open, onClose, initialData }: Props) {
         fuelType: initialData.fuelType || '',
         mileage: initialData.mileage,
         nextTuvDate: initialData.nextTuvDate || '',
-        nextPickerlDate: initialData.nextPickerlDate || '',
         notes: initialData.notes || '',
       });
     } else if (!open) {
@@ -81,7 +79,6 @@ export function VehicleDialog({ open, onClose, initialData }: Props) {
         color: '',
         fuelType: '',
         nextTuvDate: '',
-        nextPickerlDate: '',
         notes: '',
       });
     }
@@ -267,7 +264,19 @@ export function VehicleDialog({ open, onClose, initialData }: Props) {
 
                 <div className="space-y-1">
                   <Label>Kraftstoff</Label>
-                  <Input placeholder="Benzin / Diesel / Elektro" {...register('fuelType')} />
+                  <select
+                    {...register('fuelType')}
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    <option value="">— bitte wählen —</option>
+                    <option value="benzin">Benzin</option>
+                    <option value="diesel">Diesel</option>
+                    <option value="elektro">Elektro</option>
+                    <option value="hybrid">Hybrid</option>
+                    <option value="lpg">LPG / Autogas</option>
+                    <option value="cng">CNG / Erdgas</option>
+                    <option value="sonstige">Sonstige</option>
+                  </select>
                 </div>
 
                 <div className="space-y-1">
@@ -286,11 +295,6 @@ export function VehicleDialog({ open, onClose, initialData }: Props) {
                 <div className="space-y-1">
                   <Label>Nächste HU / TÜV</Label>
                   <Input type="date" {...register('nextTuvDate')} />
-                </div>
-
-                <div className="space-y-1">
-                  <Label>Nächstes Pickerl (§57a)</Label>
-                  <Input type="date" {...register('nextPickerlDate')} />
                 </div>
               </div>
 

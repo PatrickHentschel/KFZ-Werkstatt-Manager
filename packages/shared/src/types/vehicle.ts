@@ -12,13 +12,12 @@ export interface Vehicle {
   fuelType?: FuelType;
   mileage?: number;
   nextTuvDate?: string;
-  nextPickerlDate?: string;
   notes?: string;
   createdAt: string;
   updatedAt: string;
 }
 
-export type FuelType = 'gasoline' | 'diesel' | 'electric' | 'hybrid' | 'lpg' | 'cng' | 'other';
+export type FuelType = 'benzin' | 'diesel' | 'elektro' | 'hybrid' | 'lpg' | 'cng' | 'sonstige';
 
 export interface CreateVehicleRequest {
   customerId: string;
@@ -32,7 +31,6 @@ export interface CreateVehicleRequest {
   fuelType?: FuelType;
   mileage?: number;
   nextTuvDate?: string;
-  nextPickerlDate?: string;
   notes?: string;
 }
 

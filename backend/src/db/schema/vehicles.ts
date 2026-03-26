@@ -2,7 +2,7 @@ import { pgTable, uuid, varchar, integer, decimal, text, date, pgEnum, timestamp
 import { tenants } from './tenants';
 import { customers } from './customers';
 
-export const fuelTypeEnum = pgEnum('fuel_type', ['gasoline', 'diesel', 'electric', 'hybrid', 'lpg', 'cng', 'other']);
+export const fuelTypeEnum = pgEnum('fuel_type', ['benzin', 'diesel', 'elektro', 'hybrid', 'lpg', 'cng', 'sonstige']);
 
 export const vehicles = pgTable('vehicles', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -18,7 +18,6 @@ export const vehicles = pgTable('vehicles', {
   fuelType: fuelTypeEnum('fuel_type'),
   mileage: integer('mileage'),
   nextTuvDate: date('next_tuv_date'),
-  nextPickerlDate: date('next_pickerl_date'),
   notes: text('notes'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),

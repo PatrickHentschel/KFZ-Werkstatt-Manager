@@ -74,7 +74,7 @@ export function VehiclesPage() {
                   <th className="px-4 py-3 text-left text-sm font-medium">Marke / Modell</th>
                   <th className="px-4 py-3 text-left text-sm font-medium">Baujahr</th>
                   <th className="px-4 py-3 text-left text-sm font-medium">Kunde</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">Nächste HU / Pickerl</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium">Nächste HU</th>
                   <th className="px-4 py-3 text-right text-sm font-medium">Aktionen</th>
                 </tr>
               </thead>
@@ -92,7 +92,7 @@ export function VehiclesPage() {
                         : '—'}
                     </td>
                     <td className="px-4 py-3 text-sm text-muted-foreground">
-                      {v.nextPickerlDate || v.nextTuvDate || '—'}
+                      {v.nextTuvDate || '—'}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <Button
