@@ -176,9 +176,17 @@ export function ReportsPage() {
                 </div>
               )}
             </div>
-            <div className="border-t pt-3 flex items-center justify-between text-sm text-muted-foreground">
-              <span>Wareneinsatz (Teile EK)</span>
-              <span className="font-medium text-foreground">− {formatCurrency(breakdown?.costOfGoods ?? 0)}</span>
+            <div className="border-t pt-3 space-y-2">
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <span>Wareneinsatz (Teile EK)</span>
+                <span className="font-medium text-foreground">− {formatCurrency(breakdown?.costOfGoods ?? 0)}</span>
+              </div>
+              {(breakdown?.laborCost ?? 0) > 0 && (
+                <div className="flex items-center justify-between text-sm text-muted-foreground">
+                  <span>Personalkosten (Zeiterfassung)</span>
+                  <span className="font-medium text-foreground">− {formatCurrency(breakdown.laborCost)}</span>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -193,7 +201,7 @@ export function ReportsPage() {
               {formatCurrency(breakdown?.grossProfit ?? 0)}
             </div>
             <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-              vor Personalkosten &amp; Gemeinkosten
+              {(breakdown?.laborCost ?? 0) > 0 ? 'vor Gemeinkosten' : 'vor Personalkosten & Gemeinkosten'}
             </p>
             {breakdownTotal > 0 && (
               <p className="text-xs text-green-600 dark:text-green-400 mt-0.5">
