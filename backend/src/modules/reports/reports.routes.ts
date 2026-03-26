@@ -1,7 +1,7 @@
 import { FastifyPluginAsync } from 'fastify';
 import { eq, and, gte, lte, sql, count, inArray, isNotNull } from 'drizzle-orm';
 import { db } from '../../db';
-import { orders, invoices, invoiceItems, timeEntries, staff, orderItems, parts } from '../../db/schema';
+import { orders, invoices, invoiceItems, timeEntries, staff, orderItems } from '../../db/schema';
 
 const reportsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('preHandler', fastify.authenticate);
@@ -162,7 +162,7 @@ const reportsRoutes: FastifyPluginAsync = async (fastify) => {
     let laborNet = 0, partsNet = 0, miscNet = 0, costOfGoods = 0;
     let laborCost = 0;
 
-    // Classify revenue using invoice items (which carry the type field)
+    // Classify revenue and cost of goods directly from invoice items
     for (const inv of paidInvoices) {
       for (const item of inv.items) {
         const net = Number(item.quantity) * Number(item.unitPrice);
@@ -173,27 +173,16 @@ const reportsRoutes: FastifyPluginAsync = async (fastify) => {
         } else {
           miscNet += net;
         }
+        // Cost of goods: unit_cost * quantity (populated for catalog parts)
+        const cost = Number(item.unitCost ?? 0);
+        if (cost > 0) {
+          costOfGoods += Number(item.quantity) * cost;
+        }
       }
     }
 
-    // Cost of goods: still sourced from orderItems (where purchasePrice lives via parts join)
+    // Calculate labor cost from time entries linked to the invoiced orders
     if (orderIds.length > 0) {
-      const partItems = await db
-        .select({
-          quantity: orderItems.quantity,
-          purchasePrice: parts.purchasePrice,
-        })
-        .from(orderItems)
-        .leftJoin(parts, eq(orderItems.partId, parts.id))
-        .where(and(inArray(orderItems.orderId, orderIds), isNotNull(orderItems.partId)));
-
-      for (const item of partItems) {
-        if (item.purchasePrice) {
-          costOfGoods += Number(item.quantity) * Number(item.purchasePrice);
-        }
-      }
-
-      // Calculate labor cost from time entries
       const entries = await db
         .select({
           durationMinutes: timeEntries.durationMinutes,

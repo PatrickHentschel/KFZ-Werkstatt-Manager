@@ -1,6 +1,6 @@
 import { eq, and, sql, or, ilike, inArray } from 'drizzle-orm';
 import { db } from '../../db';
-import { invoices, invoiceItems, tenants, orders, customers } from '../../db/schema';
+import { invoices, invoiceItems, tenants, orders, customers, parts } from '../../db/schema';
 import { errors } from '../../utils/errors';
 import { getPaginationParams, buildPaginatedResponse } from '../../utils/pagination';
 
@@ -62,7 +62,7 @@ export class InvoicesService {
     issueDate: string;
     dueDate?: string;
     notes?: string;
-    items: Array<{ type?: 'labor' | 'part' | 'misc'; description: string; quantity: number; unitPrice: number; taxRate: number; unit?: string; sortOrder?: number }>;
+    items: Array<{ type?: 'labor' | 'part' | 'misc'; description: string; quantity: number; unitPrice: number; unitCost?: number; taxRate: number; unit?: string; sortOrder?: number }>;
   }) {
     // Generate invoice number
     const [tenant] = await db.update(tenants)
@@ -91,6 +91,7 @@ export class InvoicesService {
           description: item.description,
           quantity: String(item.quantity),
           unitPrice: String(item.unitPrice),
+          unitCost: String(item.unitCost ?? 0),
           taxRate: String(item.taxRate),
           unit: item.unit || null,
           sortOrder: item.sortOrder ?? idx,
@@ -108,6 +109,19 @@ export class InvoicesService {
     });
     if (!order) throw errors.notFound('Order');
 
+    // Fetch purchase prices for part items that are linked to catalog parts
+    const partIds = order.items.filter(i => i.partId).map(i => i.partId as string);
+    const partPrices = new Map<string, number>();
+    if (partIds.length > 0) {
+      const catalogParts = await db.query.parts.findMany({
+        where: inArray(parts.id, partIds),
+        columns: { id: true, purchasePrice: true },
+      });
+      for (const p of catalogParts) {
+        partPrices.set(p.id, Number(p.purchasePrice));
+      }
+    }
+
     const today = new Date().toISOString().split('T')[0];
     const dueDate = new Date();
     dueDate.setDate(dueDate.getDate() + 14);
@@ -123,6 +137,7 @@ export class InvoicesService {
         description: item.description,
         quantity: Number(item.quantity),
         unitPrice: Number(item.unitPrice),
+        unitCost: item.partId ? (partPrices.get(item.partId) ?? 0) : 0,
         taxRate: Number(item.taxRate),
         unit: item.unit || undefined,
         sortOrder: item.sortOrder,
@@ -136,7 +151,7 @@ export class InvoicesService {
     dueDate?: string;
     notes?: string;
     orderId?: string;
-    items?: Array<{ type?: 'labor' | 'part' | 'misc'; description: string; quantity: number; unitPrice: number; taxRate: number; unit?: string; sortOrder?: number }>;
+    items?: Array<{ type?: 'labor' | 'part' | 'misc'; description: string; quantity: number; unitPrice: number; unitCost?: number; taxRate: number; unit?: string; sortOrder?: number }>;
   }) {
     const invoice = await db.query.invoices.findFirst({
       where: and(eq(invoices.id, id), eq(invoices.tenantId, tenantId)),
@@ -165,6 +180,7 @@ export class InvoicesService {
             description: item.description,
             quantity: String(item.quantity),
             unitPrice: String(item.unitPrice),
+            unitCost: String(item.unitCost ?? 0),
             taxRate: String(item.taxRate),
             unit: item.unit || null,
             sortOrder: item.sortOrder ?? idx,

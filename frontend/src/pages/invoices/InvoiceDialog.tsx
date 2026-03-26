@@ -14,6 +14,7 @@ import { ordersApi } from '@/api/orders.api';
 import { partsApi } from '@/api/parts.api';
 import { staffApi } from '@/api/staff.api';
 import { invoicesApi, type Invoice } from '@/api/invoices.api';
+import { settingsApi } from '@/api/settings.api';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -25,6 +26,7 @@ const itemSchema = z.object({
   description: z.string().min(1, 'Pflichtfeld'),
   quantity: z.preprocess(nanToUndefined, z.number().positive()),
   unitPrice: z.preprocess(nanToUndefined, z.number().nonnegative()),
+  unitCost: z.preprocess(nanToUndefined, z.number().nonnegative()).optional(),
   taxRate: z.preprocess(nanToUndefined, z.number().nonnegative()),
   unit: z.string().optional(),
   partId: z.string().uuid().optional(),
@@ -150,6 +152,13 @@ export function InvoiceDialog({ open, onClose, invoice }: Props) {
     queryFn: () => staffApi.list({ pageSize: 100 }),
     enabled: step === 3,
   });
+
+  const { data: settingsData } = useQuery({
+    queryKey: ['settings'],
+    queryFn: () => settingsApi.get(),
+  });
+
+  const awMinutes = settingsData?.data?.awMinutes ?? 5;
 
   const handleSelectPart = (idx: number, part: { id: string; name: string; salePrice: number; taxRate: number }) => {
     setValue(`items.${idx}.description`, part.name);
