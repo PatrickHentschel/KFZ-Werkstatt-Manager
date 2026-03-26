@@ -127,23 +127,32 @@ export function OrderDetailSheet({ orderId, onClose }: Props) {
   const convertEntryMutation = useMutation({
     mutationFn: async (entry: TimeEntryWithStaff) => {
       const order = orderData!.data;
-      const hours = (entry.durationMinutes || 0) / 60;
-      const rate = Number(entry.staff.hourlyRate || 0);
+      const durationMinutes = entry.durationMinutes || 0;
+      const awRate = Number((entry.staff as any).awRate || 0);
+      const hourlyRate = Number(entry.staff.hourlyRate || 0);
+      const useAw = awRate > 0;
+      // 1 AW = 5 minutes (standard KFZ Arbeitswert)
+      const quantity = useAw
+        ? Math.round(durationMinutes / 5 * 10) / 10
+        : Math.round(durationMinutes / 60 * 100) / 100;
+      const unitPrice = useAw ? awRate : hourlyRate;
       const currentItems = order.items.map((item) => ({
         type: item.type,
         description: item.description,
         quantity: Number(item.quantity),
         unitPrice: Number(item.unitPrice),
         taxRate: Number(item.taxRate),
+        unit: (item as any).unit || undefined,
         partId: item.partId || undefined,
         sortOrder: item.sortOrder,
       }));
       const newItem = {
         type: 'labor' as const,
         description: `${entry.staff.firstName} ${entry.staff.lastName}${entry.description ? ` – ${entry.description}` : ''}`,
-        quantity: Math.round(hours * 100) / 100,
-        unitPrice: rate,
+        quantity,
+        unitPrice,
         taxRate: 20,
+        unit: useAw ? 'AW' : 'Std',
         sortOrder: currentItems.length,
       };
       await ordersApi.updateItems(orderId!, [...currentItems, newItem]);
