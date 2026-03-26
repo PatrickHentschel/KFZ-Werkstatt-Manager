@@ -493,6 +493,7 @@ export function InvoiceDialog({ open, onClose, invoice }: Props) {
                                           id: part.id,
                                           name: part.name,
                                           salePrice: part.salePrice,
+                                          purchasePrice: part.purchasePrice,
                                           taxRate: part.taxRate,
                                         })}
                                       >
