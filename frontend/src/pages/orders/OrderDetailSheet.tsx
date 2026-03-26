@@ -341,6 +341,7 @@ export function OrderDetailSheet({ orderId, onClose }: Props) {
                                 <td className="px-3 py-2">{item.description}</td>
                                 <td className="px-3 py-2 text-right tabular-nums">
                                   {Number(item.quantity).toLocaleString('de-AT')}
+                                  {item.unit && <span className="ml-1 text-muted-foreground text-xs">{item.unit}</span>}
                                 </td>
                                 <td className="px-3 py-2 text-right tabular-nums">
                                   {Number(item.unitPrice).toLocaleString('de-AT', { style: 'currency', currency: 'EUR' })}
