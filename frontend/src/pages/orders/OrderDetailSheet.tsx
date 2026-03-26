@@ -128,7 +128,7 @@ export function OrderDetailSheet({ orderId, onClose }: Props) {
     mutationFn: async (entry: TimeEntryWithStaff) => {
       const order = orderData!.data;
       const durationMinutes = entry.durationMinutes || 0;
-      const awRate = Number((entry.staff as any).awRate || 0);
+      const awRate = Number(entry.staff.awRate || 0);
       const hourlyRate = Number(entry.staff.hourlyRate || 0);
       const useAw = awRate > 0;
       // 1 AW = 5 minutes (standard KFZ Arbeitswert)
@@ -142,7 +142,7 @@ export function OrderDetailSheet({ orderId, onClose }: Props) {
         quantity: Number(item.quantity),
         unitPrice: Number(item.unitPrice),
         taxRate: Number(item.taxRate),
-        unit: (item as any).unit || undefined,
+        unit: item.unit || undefined,
         partId: item.partId || undefined,
         sortOrder: item.sortOrder,
       }));

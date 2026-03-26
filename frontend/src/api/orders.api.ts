@@ -5,7 +5,7 @@ export type OrderStatus = 'open' | 'in_progress' | 'waiting_parts' | 'done' | 'i
 
 export interface OrderItem {
   id: string; orderId: string; type: 'labor' | 'part' | 'misc';
-  description: string; quantity: number; unitPrice: number; taxRate: number; sortOrder: number;
+  description: string; quantity: number; unitPrice: number; taxRate: number; unit?: string; sortOrder: number;
   partId?: string;
 }
 
@@ -35,6 +35,7 @@ export interface TimeEntryWithStaff {
     firstName: string;
     lastName: string;
     hourlyRate?: number;
+    awRate?: number;
     color?: string;
   };
 }
