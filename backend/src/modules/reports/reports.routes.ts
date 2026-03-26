@@ -159,6 +159,7 @@ const reportsRoutes: FastifyPluginAsync = async (fastify) => {
     const orderIds = paidInvoices.map(i => i.orderId).filter(Boolean) as string[];
 
     let laborNet = 0, partsNet = 0, miscNet = 0, costOfGoods = 0;
+    let laborCost = 0;
 
     if (orderIds.length > 0) {
       const items = await db
