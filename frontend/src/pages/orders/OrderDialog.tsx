@@ -26,6 +26,7 @@ const itemSchema = z.object({
   quantity: z.preprocess(nanToUndefined, z.number().positive()),
   unitPrice: z.preprocess(nanToUndefined, z.number().nonnegative()),
   taxRate: z.preprocess(nanToUndefined, z.number().nonnegative()),
+  unit: z.string().optional(),
   partId: z.string().uuid().optional(),
 });
 
