@@ -490,13 +490,28 @@ export function InvoiceDialog({ open, onClose, invoice }: Props) {
                               )}
                             </div>
                             <div className="col-span-2">
-                              <Input
-                                type="number"
-                                step="0.01"
-                                placeholder="Menge"
-                                {...register(`items.${idx}.quantity`, { valueAsNumber: true })}
-                                className="h-8 text-sm"
-                              />
+                              {itemType === 'labor' ? (
+                                <div className="flex items-center gap-1">
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    placeholder="Menge"
+                                    {...register(`items.${idx}.quantity`, { valueAsNumber: true })}
+                                    className="h-8 text-sm"
+                                  />
+                                  <span className="text-xs text-muted-foreground font-medium shrink-0">
+                                    {watch(`items.${idx}.unit`) || 'AW'}
+                                  </span>
+                                </div>
+                              ) : (
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  placeholder="Menge"
+                                  {...register(`items.${idx}.quantity`, { valueAsNumber: true })}
+                                  className="h-8 text-sm"
+                                />
+                              )}
                             </div>
                             <div className="col-span-2">
                               <Input
@@ -540,11 +555,11 @@ export function InvoiceDialog({ open, onClose, invoice }: Props) {
                                 defaultValue=""
                                 onChange={(e) => handleStaffSelectForItem(idx, e.target.value)}
                               >
-                                <option value="">— Stundensatz übernehmen —</option>
+                                <option value="">— Satz übernehmen —</option>
                                 {staffData.data.data.map((s) => (
                                   <option key={s.id} value={s.id}>
                                     {s.firstName} {s.lastName}
-                                    {s.hourlyRate ? ` (${s.hourlyRate.toLocaleString('de-AT', { style: 'currency', currency: 'EUR' })}/h)` : ''}
+                                    {s.awRate ? ` (${Number(s.awRate).toLocaleString('de-AT', { style: 'currency', currency: 'EUR' })}/AW)` : s.hourlyRate ? ` (${Number(s.hourlyRate).toLocaleString('de-AT', { style: 'currency', currency: 'EUR' })}/h)` : ''}
                                   </option>
                                 ))}
                               </select>
