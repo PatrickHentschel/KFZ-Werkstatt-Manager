@@ -162,39 +162,19 @@ const reportsRoutes: FastifyPluginAsync = async (fastify) => {
     let laborNet = 0, partsNet = 0, miscNet = 0, costOfGoods = 0;
     let laborCost = 0;
 
-    // Classify revenue and cost of goods directly from invoice items
+    // Classify revenue and costs directly from invoice items
     for (const inv of paidInvoices) {
       for (const item of inv.items) {
         const net = Number(item.quantity) * Number(item.unitPrice);
+        const cost = Number(item.unitCost ?? 0) * Number(item.quantity);
         if (item.type === 'labor') {
           laborNet += net;
+          laborCost += cost;
         } else if (item.type === 'part') {
           partsNet += net;
+          costOfGoods += cost;
         } else {
           miscNet += net;
-        }
-        // Cost of goods: unit_cost * quantity (populated for catalog parts)
-        const cost = Number(item.unitCost ?? 0);
-        if (cost > 0) {
-          costOfGoods += Number(item.quantity) * cost;
-        }
-      }
-    }
-
-    // Calculate labor cost from time entries linked to the invoiced orders
-    if (orderIds.length > 0) {
-      const entries = await db
-        .select({
-          durationMinutes: timeEntries.durationMinutes,
-          hourlyRate: staff.hourlyRate,
-        })
-        .from(timeEntries)
-        .innerJoin(staff, eq(timeEntries.staffId, staff.id))
-        .where(and(isNotNull(timeEntries.orderId), inArray(timeEntries.orderId, orderIds)));
-
-      for (const entry of entries) {
-        if (entry.durationMinutes && entry.hourlyRate) {
-          laborCost += (entry.durationMinutes / 60) * Number(entry.hourlyRate);
         }
       }
     }
