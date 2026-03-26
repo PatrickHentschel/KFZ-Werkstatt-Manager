@@ -89,6 +89,12 @@ export function OrderDetailSheet({ orderId, onClose }: Props) {
     enabled: !!orderId,
   });
 
+  const { data: settingsData } = useQuery({
+    queryKey: ['settings'],
+    queryFn: () => settingsApi.get(),
+    enabled: !!orderId,
+  });
+
   const addTimeEntryMutation = useMutation({
     mutationFn: (data: { staffId: string; description?: string; durationMinutes: number }) =>
       ordersApi.addTimeEntry(orderId!, data),
