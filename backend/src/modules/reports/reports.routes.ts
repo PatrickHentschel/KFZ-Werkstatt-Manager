@@ -154,6 +154,7 @@ const reportsRoutes: FastifyPluginAsync = async (fastify) => {
 
     const paidInvoices = await db.query.invoices.findMany({
       where: () => whereClause!,
+      with: { items: true },
     });
 
     const orderIds = paidInvoices.map(i => i.orderId).filter(Boolean) as string[];
@@ -161,30 +162,34 @@ const reportsRoutes: FastifyPluginAsync = async (fastify) => {
     let laborNet = 0, partsNet = 0, miscNet = 0, costOfGoods = 0;
     let laborCost = 0;
 
-    if (orderIds.length > 0) {
-      const items = await db
-        .select({
-          type: orderItems.type,
-          quantity: orderItems.quantity,
-          unitPrice: orderItems.unitPrice,
-          partId: orderItems.partId,
-          purchasePrice: parts.purchasePrice,
-        })
-        .from(orderItems)
-        .leftJoin(parts, eq(orderItems.partId, parts.id))
-        .where(inArray(orderItems.orderId, orderIds));
-
-      for (const item of items) {
+    // Classify revenue using invoice items (which carry the type field)
+    for (const inv of paidInvoices) {
+      for (const item of inv.items) {
         const net = Number(item.quantity) * Number(item.unitPrice);
         if (item.type === 'labor') {
           laborNet += net;
         } else if (item.type === 'part') {
           partsNet += net;
-          if (item.purchasePrice) {
-            costOfGoods += Number(item.quantity) * Number(item.purchasePrice);
-          }
         } else {
           miscNet += net;
+        }
+      }
+    }
+
+    // Cost of goods: still sourced from orderItems (where purchasePrice lives via parts join)
+    if (orderIds.length > 0) {
+      const partItems = await db
+        .select({
+          quantity: orderItems.quantity,
+          purchasePrice: parts.purchasePrice,
+        })
+        .from(orderItems)
+        .leftJoin(parts, eq(orderItems.partId, parts.id))
+        .where(and(inArray(orderItems.orderId, orderIds), isNotNull(orderItems.partId)));
+
+      for (const item of partItems) {
+        if (item.purchasePrice) {
+          costOfGoods += Number(item.quantity) * Number(item.purchasePrice);
         }
       }
 
