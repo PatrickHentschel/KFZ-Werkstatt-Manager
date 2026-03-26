@@ -30,6 +30,7 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
       taxId: z.string().optional(),
       taxRate: z.number().min(0).max(100).optional(),
       invoicePrefix: z.string().max(20).optional(),
+      awMinutes: z.number().int().min(1).max(60).optional(),
     });
 
     const body = schema.parse(request.body);
