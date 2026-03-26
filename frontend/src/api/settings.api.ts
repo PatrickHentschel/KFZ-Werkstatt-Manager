@@ -5,6 +5,7 @@ export interface TenantSettings {
   address?: string; city?: string;
   taxId?: string; taxRate: number; invoicePrefix: string;
   invoiceCounter: number; plan: string; logoUrl?: string;
+  awMinutes: number;
 }
 
 export const settingsApi = {
