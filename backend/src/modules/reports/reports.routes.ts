@@ -1,7 +1,7 @@
 import { FastifyPluginAsync } from 'fastify';
-import { eq, and, gte, lte, sql, count, inArray, isNotNull } from 'drizzle-orm';
+import { eq, and, gte, lte, sql } from 'drizzle-orm';
 import { db } from '../../db';
-import { orders, invoices, invoiceItems, timeEntries, staff, orderItems } from '../../db/schema';
+import { orders, invoices, timeEntries, staff } from '../../db/schema';
 
 const reportsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('preHandler', fastify.authenticate);
@@ -156,8 +156,6 @@ const reportsRoutes: FastifyPluginAsync = async (fastify) => {
       where: () => whereClause!,
       with: { items: true },
     });
-
-    const orderIds = paidInvoices.map(i => i.orderId).filter(Boolean) as string[];
 
     let laborNet = 0, partsNet = 0, miscNet = 0, costOfGoods = 0;
     let laborCost = 0;

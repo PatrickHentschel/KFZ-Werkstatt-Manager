@@ -6,7 +6,7 @@ export type InvoiceType = 'invoice' | 'quote' | 'credit_note';
 
 export interface InvoiceItem {
   id: string; invoiceId: string; type: 'labor' | 'part' | 'misc'; description: string;
-  quantity: number; unitPrice: number; taxRate: number; unit?: string; sortOrder: number;
+  quantity: number; unitPrice: number; unitCost: number; taxRate: number; unit?: string; sortOrder: number;
 }
 
 export interface Invoice {
