@@ -187,6 +187,22 @@ const reportsRoutes: FastifyPluginAsync = async (fastify) => {
           miscNet += net;
         }
       }
+
+      // Calculate labor cost from time entries
+      const entries = await db
+        .select({
+          durationMinutes: timeEntries.durationMinutes,
+          hourlyRate: staff.hourlyRate,
+        })
+        .from(timeEntries)
+        .innerJoin(staff, eq(timeEntries.staffId, staff.id))
+        .where(and(isNotNull(timeEntries.orderId), inArray(timeEntries.orderId, orderIds)));
+
+      for (const entry of entries) {
+        if (entry.durationMinutes && entry.hourlyRate) {
+          laborCost += (entry.durationMinutes / 60) * Number(entry.hourlyRate);
+        }
+      }
     }
 
     const round = (n: number) => Math.round(n * 100) / 100;
@@ -196,7 +212,8 @@ const reportsRoutes: FastifyPluginAsync = async (fastify) => {
       partsNet: round(partsNet),
       miscNet: round(miscNet),
       costOfGoods: round(costOfGoods),
-      grossProfit: round(laborNet + partsNet + miscNet - costOfGoods),
+      laborCost: round(laborCost),
+      grossProfit: round(laborNet + partsNet + miscNet - costOfGoods - laborCost),
     };
   });
 
