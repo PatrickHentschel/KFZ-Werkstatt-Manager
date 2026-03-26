@@ -161,6 +161,7 @@ export class InvoicesService {
         await db.insert(invoiceItems).values(
           data.items.map((item, idx) => ({
             invoiceId: id,
+            type: item.type ?? 'misc',
             description: item.description,
             quantity: String(item.quantity),
             unitPrice: String(item.unitPrice),
