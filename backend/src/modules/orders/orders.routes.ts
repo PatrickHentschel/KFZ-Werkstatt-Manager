@@ -19,6 +19,7 @@ const orderItemSchema = z.object({
   quantity: z.number().positive(),
   unitPrice: z.number().nonnegative(),
   taxRate: z.number().nonnegative(),
+  unit: z.string().max(10).optional(),
   partId: z.string().uuid().optional(),
   sortOrder: z.number().int().optional(),
 });

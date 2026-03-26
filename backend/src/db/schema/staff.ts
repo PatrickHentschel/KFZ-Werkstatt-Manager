@@ -12,6 +12,7 @@ export const staff = pgTable('staff', {
   phone: varchar('phone', { length: 50 }),
   role: varchar('role', { length: 100 }).notNull().default('Techniker'),
   hourlyRate: decimal('hourly_rate', { precision: 10, scale: 2 }),
+  awRate: decimal('aw_rate', { precision: 10, scale: 2 }),
   color: varchar('color', { length: 20 }),
   isActive: boolean('is_active').notNull().default(true),
   createdAt: timestamp('created_at').notNull().defaultNow(),

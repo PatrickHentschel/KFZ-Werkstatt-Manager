@@ -9,6 +9,7 @@ const createStaffSchema = z.object({
   phone: z.string().optional(),
   role: z.string().default('Techniker'),
   hourlyRate: z.number().nonnegative().optional(),
+  awRate: z.number().nonnegative().optional(),
   color: z.string().optional(),
 });
 
@@ -24,6 +25,7 @@ const staffRoutes: FastifyPluginAsync = async (fastify) => {
     const member = await staffService.create(request.user.tenantId, {
       ...body,
       hourlyRate: body.hourlyRate ? String(body.hourlyRate) : undefined,
+      awRate: body.awRate ? String(body.awRate) : undefined,
     } as any);
     return reply.code(201).send(member);
   });

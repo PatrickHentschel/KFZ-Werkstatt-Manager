@@ -43,6 +43,13 @@
       "when": 1774483200000,
       "tag": "0005_german_fuel_type_enum",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1774569600000,
+      "tag": "0006_aw_arbeitswert",
+      "breakpoints": true
     }
   ]
 }

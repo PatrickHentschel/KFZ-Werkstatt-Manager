@@ -62,7 +62,7 @@ export class InvoicesService {
     issueDate: string;
     dueDate?: string;
     notes?: string;
-    items: Array<{ description: string; quantity: number; unitPrice: number; taxRate: number; sortOrder?: number }>;
+    items: Array<{ description: string; quantity: number; unitPrice: number; taxRate: number; unit?: string; sortOrder?: number }>;
   }) {
     // Generate invoice number
     const [tenant] = await db.update(tenants)
@@ -91,6 +91,7 @@ export class InvoicesService {
           quantity: String(item.quantity),
           unitPrice: String(item.unitPrice),
           taxRate: String(item.taxRate),
+          unit: item.unit || null,
           sortOrder: item.sortOrder ?? idx,
         }))
       );
@@ -121,6 +122,7 @@ export class InvoicesService {
         quantity: Number(item.quantity),
         unitPrice: Number(item.unitPrice),
         taxRate: Number(item.taxRate),
+        unit: item.unit || undefined,
         sortOrder: item.sortOrder,
       })),
     });
@@ -132,7 +134,7 @@ export class InvoicesService {
     dueDate?: string;
     notes?: string;
     orderId?: string;
-    items?: Array<{ description: string; quantity: number; unitPrice: number; taxRate: number; sortOrder?: number }>;
+    items?: Array<{ description: string; quantity: number; unitPrice: number; taxRate: number; unit?: string; sortOrder?: number }>;
   }) {
     const invoice = await db.query.invoices.findFirst({
       where: and(eq(invoices.id, id), eq(invoices.tenantId, tenantId)),
@@ -161,6 +163,7 @@ export class InvoicesService {
             quantity: String(item.quantity),
             unitPrice: String(item.unitPrice),
             taxRate: String(item.taxRate),
+            unit: item.unit || null,
             sortOrder: item.sortOrder ?? idx,
           }))
         );

@@ -21,6 +21,7 @@ const staffSchema = z.object({
   phone: z.string().optional(),
   role: z.enum(['technician', 'reception', 'admin']),
   hourlyRate: z.preprocess(nanToUndefined, z.number().nonnegative().optional()),
+  awRate: z.preprocess(nanToUndefined, z.number().nonnegative().optional()),
   color: z.string().optional(),
   isActive: z.boolean(),
 });
@@ -59,6 +60,7 @@ export function StaffDialog({ open, onClose, initialData }: Props) {
             phone: initialData.phone ?? '',
             role: (initialData.role as any) ?? 'technician',
             hourlyRate: initialData.hourlyRate ?? undefined,
+            awRate: initialData.awRate ?? undefined,
             color: initialData.color ?? '#3b82f6',
             isActive: initialData.isActive,
           }
@@ -136,9 +138,18 @@ export function StaffDialog({ open, onClose, initialData }: Props) {
                 </select>
               </div>
               <div className="space-y-1">
-                <Label>Stundensatz (€)</Label>
+                <Label>Stundensatz (€/h)</Label>
                 <Input type="number" step="0.01" placeholder="0.00" {...register('hourlyRate', { valueAsNumber: true })} />
               </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label>AW-Satz (€/AW)</Label>
+              <div className="flex items-center gap-2">
+                <Input type="number" step="0.01" placeholder="0.00" {...register('awRate', { valueAsNumber: true })} />
+                <span className="text-xs text-muted-foreground whitespace-nowrap">1 AW = 5 min</span>
+              </div>
+              <p className="text-xs text-muted-foreground">Arbeitswert-Verrechnungssatz für Arbeitspositionen</p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">

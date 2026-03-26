@@ -122,6 +122,7 @@ export class OrdersService {
     quantity: number;
     unitPrice: number;
     taxRate: number;
+    unit?: string;
     partId?: string;
     sortOrder?: number;
   }>) {
@@ -139,6 +140,7 @@ export class OrdersService {
           quantity: String(item.quantity),
           unitPrice: String(item.unitPrice),
           taxRate: String(item.taxRate),
+          unit: item.unit || null,
           partId: item.partId,
           sortOrder: item.sortOrder ?? idx,
         }))

@@ -4,7 +4,7 @@ import type { PaginatedResponse } from './customers.api';
 export interface StaffMember {
   id: string; tenantId: string; userId?: string;
   firstName: string; lastName: string; email?: string; phone?: string;
-  role: string; hourlyRate?: number; color?: string; isActive: boolean;
+  role: string; hourlyRate?: number; awRate?: number; color?: string; isActive: boolean;
   createdAt: string; updatedAt: string;
 }
 

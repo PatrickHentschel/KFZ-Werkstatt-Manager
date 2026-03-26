@@ -31,6 +31,7 @@ export const orderItems = pgTable('order_items', {
   quantity: decimal('quantity', { precision: 10, scale: 2 }).notNull().default('1'),
   unitPrice: decimal('unit_price', { precision: 10, scale: 2 }).notNull(),
   taxRate: decimal('tax_rate', { precision: 5, scale: 2 }).notNull().default('20.00'),
+  unit: varchar('unit', { length: 10 }),
   partId: uuid('part_id'),
   sortOrder: integer('sort_order').notNull().default(0),
   createdAt: timestamp('created_at').notNull().defaultNow(),
