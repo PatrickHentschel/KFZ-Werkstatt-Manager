@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { ordersApi, type TimeEntryWithStaff } from '@/api/orders.api';
 import { staffApi } from '@/api/staff.api';
+import { settingsApi } from '@/api/settings.api';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
