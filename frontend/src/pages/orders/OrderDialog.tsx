@@ -128,6 +128,7 @@ export function OrderDialog({ open, onClose }: Props) {
         const itemsWithSort = data.items.map((item, idx) => ({
           ...item,
           sortOrder: idx + 1,
+          unit: item.unit || undefined,
           partId: item.partId || undefined,
         }));
         await ordersApi.updateItems(response.data.id, itemsWithSort);
