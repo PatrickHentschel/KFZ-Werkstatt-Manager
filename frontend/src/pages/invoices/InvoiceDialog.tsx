@@ -155,8 +155,13 @@ export function InvoiceDialog({ open, onClose, invoice }: Props) {
 
   const handleStaffSelectForItem = (idx: number, staffId: string) => {
     const staff = staffData?.data.data.find((s) => s.id === staffId);
-    if (staff?.hourlyRate) {
+    if (!staff) return;
+    if (staff.awRate) {
+      setValue(`items.${idx}.unitPrice`, staff.awRate);
+      setValue(`items.${idx}.unit`, 'AW');
+    } else if (staff.hourlyRate) {
       setValue(`items.${idx}.unitPrice`, staff.hourlyRate);
+      setValue(`items.${idx}.unit`, 'Std');
     }
   };
 
