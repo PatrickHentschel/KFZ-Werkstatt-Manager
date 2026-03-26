@@ -110,7 +110,7 @@ export function InvoiceDialog({ open, onClose, invoice }: Props) {
         items: [...invoice.items]
           .sort((a, b) => a.sortOrder - b.sortOrder)
           .map(item => ({
-            type: 'misc' as const,
+            type: (item.type ?? 'misc') as 'labor' | 'part' | 'misc',
             description: item.description,
             quantity: Number(item.quantity),
             unitPrice: Number(item.unitPrice),

@@ -5,7 +5,7 @@ export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'cancelled';
 export type InvoiceType = 'invoice' | 'quote' | 'credit_note';
 
 export interface InvoiceItem {
-  id: string; invoiceId: string; description: string;
+  id: string; invoiceId: string; type: 'labor' | 'part' | 'misc'; description: string;
   quantity: number; unitPrice: number; taxRate: number; unit?: string; sortOrder: number;
 }
 
