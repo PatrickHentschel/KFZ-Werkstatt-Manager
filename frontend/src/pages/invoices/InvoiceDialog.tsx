@@ -384,7 +384,7 @@ export function InvoiceDialog({ open, onClose, invoice }: Props) {
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => append({ type: t, description: '', quantity: 1, unitPrice: 0, taxRate: 20 })}
+                          onClick={() => append({ type: t, description: '', quantity: 1, unitPrice: 0, taxRate: 20, unit: t === 'labor' ? 'AW' : undefined })}
                         >
                           <Plus className="mr-1 h-3 w-3" /> {TYPE_LABEL[t]}
                         </Button>
