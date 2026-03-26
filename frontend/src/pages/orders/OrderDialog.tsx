@@ -474,13 +474,28 @@ export function OrderDialog({ open, onClose }: Props) {
                             </div>
 
                             <div className="col-span-2">
-                              <Input
-                                type="number"
-                                step="0.01"
-                                placeholder="Menge"
-                                {...register(`items.${idx}.quantity`, { valueAsNumber: true })}
-                                className="h-8 text-sm"
-                              />
+                              {itemType === 'labor' ? (
+                                <div className="flex items-center gap-1">
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    placeholder="Menge"
+                                    {...register(`items.${idx}.quantity`, { valueAsNumber: true })}
+                                    className="h-8 text-sm"
+                                  />
+                                  <span className="text-xs text-muted-foreground font-medium shrink-0">
+                                    {watch(`items.${idx}.unit`) || 'AW'}
+                                  </span>
+                                </div>
+                              ) : (
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  placeholder="Menge"
+                                  {...register(`items.${idx}.quantity`, { valueAsNumber: true })}
+                                  className="h-8 text-sm"
+                                />
+                              )}
                             </div>
                             <div className="col-span-2">
                               <Input
