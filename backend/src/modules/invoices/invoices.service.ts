@@ -136,7 +136,7 @@ export class InvoicesService {
     dueDate?: string;
     notes?: string;
     orderId?: string;
-    items?: Array<{ description: string; quantity: number; unitPrice: number; taxRate: number; unit?: string; sortOrder?: number }>;
+    items?: Array<{ type?: 'labor' | 'part' | 'misc'; description: string; quantity: number; unitPrice: number; taxRate: number; unit?: string; sortOrder?: number }>;
   }) {
     const invoice = await db.query.invoices.findFirst({
       where: and(eq(invoices.id, id), eq(invoices.tenantId, tenantId)),
