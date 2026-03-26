@@ -160,9 +160,10 @@ export function InvoiceDialog({ open, onClose, invoice }: Props) {
 
   const awMinutes = settingsData?.data?.awMinutes ?? 5;
 
-  const handleSelectPart = (idx: number, part: { id: string; name: string; salePrice: number; taxRate: number }) => {
+  const handleSelectPart = (idx: number, part: { id: string; name: string; salePrice: number; purchasePrice: number; taxRate: number }) => {
     setValue(`items.${idx}.description`, part.name);
     setValue(`items.${idx}.unitPrice`, part.salePrice);
+    setValue(`items.${idx}.unitCost`, part.purchasePrice);
     setValue(`items.${idx}.taxRate`, part.taxRate);
     setValue(`items.${idx}.partId`, part.id);
     setPartPickerIdx(null);
@@ -170,11 +171,15 @@ export function InvoiceDialog({ open, onClose, invoice }: Props) {
   };
 
   const handleStaffSelectForItem = (idx: number, staffId: string) => {
-    const staff = staffData?.data.data.find((s) => s.id === staffId);
-    if (!staff) return;
-    if (staff.awRate) {
-      setValue(`items.${idx}.unitPrice`, staff.awRate);
+    const member = staffData?.data.data.find((s) => s.id === staffId);
+    if (!member) return;
+    if (member.awRate) {
+      setValue(`items.${idx}.unitPrice`, Number(member.awRate));
       setValue(`items.${idx}.unit`, 'AW');
+    }
+    if (member.hourlyRate) {
+      // Cost per AW = hourlyRate × (awMinutes / 60)
+      setValue(`items.${idx}.unitCost`, Number(member.hourlyRate) * (awMinutes / 60));
     }
   };
 
