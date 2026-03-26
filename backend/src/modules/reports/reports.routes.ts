@@ -1,5 +1,5 @@
 import { FastifyPluginAsync } from 'fastify';
-import { eq, and, gte, lte, sql, count, inArray } from 'drizzle-orm';
+import { eq, and, gte, lte, sql, count, inArray, isNotNull } from 'drizzle-orm';
 import { db } from '../../db';
 import { orders, invoices, invoiceItems, timeEntries, staff, orderItems, parts } from '../../db/schema';
 
