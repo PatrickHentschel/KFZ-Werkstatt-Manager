@@ -356,7 +356,7 @@ export function OrderDialog({ open, onClose }: Props) {
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => append({ type: t, description: '', quantity: 1, unitPrice: 0, taxRate: 20 })}
+                          onClick={() => append({ type: t, description: '', quantity: 1, unitPrice: 0, taxRate: 20, unit: t === 'labor' ? 'AW' : undefined })}
                         >
                           <Plus className="mr-1 h-3 w-3" /> {TYPE_LABEL[t]}
                         </Button>
@@ -540,11 +540,11 @@ export function OrderDialog({ open, onClose }: Props) {
                                 defaultValue=""
                                 onChange={(e) => handleStaffSelectForItem(idx, e.target.value)}
                               >
-                                <option value="">— Stundensatz übernehmen —</option>
+                                <option value="">— Satz übernehmen —</option>
                                 {staffData.data.data.map((s) => (
                                   <option key={s.id} value={s.id}>
                                     {s.firstName} {s.lastName}
-                                    {s.hourlyRate ? ` (${s.hourlyRate.toLocaleString('de-AT', { style: 'currency', currency: 'EUR' })}/h)` : ''}
+                                    {s.awRate ? ` (${Number(s.awRate).toLocaleString('de-AT', { style: 'currency', currency: 'EUR' })}/AW)` : s.hourlyRate ? ` (${Number(s.hourlyRate).toLocaleString('de-AT', { style: 'currency', currency: 'EUR' })}/h)` : ''}
                                   </option>
                                 ))}
                               </select>
