@@ -8,6 +8,8 @@ export interface Staff {
   phone?: string;
   role: string;
   hourlyRate?: number;
+  awRate?: number;
+  costRate?: number;
   color?: string;
   isActive: boolean;
   createdAt: string;

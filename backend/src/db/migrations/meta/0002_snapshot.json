@@ -1478,6 +1478,18 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "aw_rate": {
+          "name": "aw_rate",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cost_rate": {
+          "name": "cost_rate",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},
