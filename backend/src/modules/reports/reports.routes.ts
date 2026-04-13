@@ -177,6 +177,31 @@ const reportsRoutes: FastifyPluginAsync = async (fastify) => {
       }
     }
 
+    // Calculate staff cost based on time entries and staff cost rate
+    const timeEntriesWhere = and(
+      eq(timeEntries.tenantId, tenantId),
+      from ? gte(timeEntries.startTime, new Date(from)) : undefined,
+      to ? lte(timeEntries.startTime, new Date(to)) : undefined,
+    );
+
+    const timeEntriesData = await db.query.timeEntries.findMany({
+      where: () => timeEntriesWhere!,
+      with: { staff: true },
+    });
+
+    let staffCostFromTimeEntries = 0;
+    for (const entry of timeEntriesData) {
+      const durationHours = (entry.durationMinutes || 0) / 60;
+      const staffCostRate = entry.staff.costRate ? Number(entry.staff.costRate) : 0;
+      if (staffCostRate > 0 && durationHours > 0) {
+        staffCostFromTimeEntries += durationHours * staffCostRate;
+      }
+    }
+
+    // Use staff cost from time entries if there are time entries with cost rates
+    // Otherwise fall back to the unitCost from invoice items (legacy behavior)
+    const finalLaborCost = staffCostFromTimeEntries > 0 ? staffCostFromTimeEntries : laborCost;
+
     const round = (n: number) => Math.round(n * 100) / 100;
     return {
       period: { from: from || null, to: to || null },
@@ -184,8 +209,8 @@ const reportsRoutes: FastifyPluginAsync = async (fastify) => {
       partsNet: round(partsNet),
       miscNet: round(miscNet),
       costOfGoods: round(costOfGoods),
-      laborCost: round(laborCost),
-      grossProfit: round(laborNet + partsNet + miscNet - costOfGoods - laborCost),
+      laborCost: round(finalLaborCost),
+      grossProfit: round(laborNet + partsNet + miscNet - costOfGoods - finalLaborCost),
     };
   });
 
