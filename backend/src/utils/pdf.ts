@@ -4,7 +4,7 @@ import type { Tenant } from '../db/schema/tenants';
 type InvoiceForPdf = {
   invoiceNumber: string;
   type: string;
-  issueDate: string;
+  issueDate: string | null;
   dueDate?: string | null;
   notes?: string | null;
   customer: {
@@ -14,7 +14,7 @@ type InvoiceForPdf = {
     address?: string | null;
     city?: string | null;
     postalCode?: string | null;
-  };
+  } | null;
   items: Array<{
     description: string;
     quantity: string;
@@ -48,12 +48,15 @@ export async function generateInvoicePdf(invoice: InvoiceForPdf, tenant: Tenant)
     if (tenant.phone) doc.text(tenant.phone);
 
     // Recipient block (right side, aligned with sender)
-    const customerName = invoice.customer.companyName ||
-      `${invoice.customer.firstName || ''} ${invoice.customer.lastName || ''}`.trim();
-    doc.fontSize(10).font('Helvetica').text(customerName, 350, 60, { width: 200 });
-    if (invoice.customer.address) doc.text(invoice.customer.address, 350, undefined!, { width: 200 });
-    const cityLine = [invoice.customer.postalCode, invoice.customer.city].filter(Boolean).join(' ');
-    if (cityLine) doc.text(cityLine, 350, undefined!, { width: 200 });
+    const customer = invoice.customer;
+    if (customer) {
+      const customerName = customer.companyName ||
+        `${customer.firstName || ''} ${customer.lastName || ''}`.trim();
+      doc.fontSize(10).font('Helvetica').text(customerName, 350, 60, { width: 200 });
+      if (customer.address) doc.text(customer.address, 350, undefined!, { width: 200 });
+      const cityLine = [customer.postalCode, customer.city].filter(Boolean).join(' ');
+      if (cityLine) doc.text(cityLine, 350, undefined!, { width: 200 });
+    }
 
     // Invoice header
     doc.moveDown(3);
@@ -62,7 +65,7 @@ export async function generateInvoicePdf(invoice: InvoiceForPdf, tenant: Tenant)
     doc.moveDown(0.5);
     doc.fontSize(10).font('Helvetica');
     doc.text(`Nr.: ${invoice.invoiceNumber}`);
-    doc.text(`Datum: ${formatDate(invoice.issueDate)}`);
+    doc.text(`Datum: ${invoice.issueDate ? formatDate(invoice.issueDate) : '-'}`);
     if (invoice.dueDate) doc.text(`Fällig: ${formatDate(invoice.dueDate)}`);
 
     // Items table

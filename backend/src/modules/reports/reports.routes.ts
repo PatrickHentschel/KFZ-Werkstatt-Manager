@@ -124,6 +124,7 @@ const reportsRoutes: FastifyPluginAsync = async (fastify) => {
     const map = new Map<string, { customerId: string; name: string; type: string; invoiceCount: number; totalNet: number }>();
     for (const inv of paidInvoices) {
       const c = inv.customer;
+      if (!c) continue;
       const name = c.type === 'business' ? (c.companyName || `${c.firstName} ${c.lastName}`) : `${c.firstName} ${c.lastName}`;
       const existing = map.get(c.id) || { customerId: c.id, name, type: c.type, invoiceCount: 0, totalNet: 0 };
       existing.invoiceCount += 1;

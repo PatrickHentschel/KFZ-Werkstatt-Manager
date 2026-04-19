@@ -80,6 +80,11 @@ const invoicesRoutes: FastifyPluginAsync = async (fastify) => {
     const tenantId = request.user.tenantId;
 
     const invoice = await invoicesService.getById(tenantId, id);
+
+    if (!invoice.customerId) {
+      return reply.code(422).send({ statusCode: 422, error: 'Unprocessable Entity', message: 'Draft invoice has no customer assigned' });
+    }
+
     const tenant = await db.query.tenants.findFirst({ where: eq(tenants.id, tenantId) });
     const customer = await db.query.customers.findFirst({ where: eq(customers.id, invoice.customerId) });
 
