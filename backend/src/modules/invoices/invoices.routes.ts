@@ -37,6 +37,30 @@ const updateInvoiceSchema = z.object({
   items: z.array(invoiceItemSchema).optional(),
 });
 
+// Per-item schema for drafts — every field optional so half-typed items round-trip.
+// Note: items missing `description` are filtered server-side (invoice_items.description is NOT NULL).
+const draftItemSchema = z.object({
+  type: z.enum(['labor', 'part', 'misc']).optional(),
+  description: z.string().optional(),
+  quantity: z.number().nonnegative().optional(),
+  unitPrice: z.number().nonnegative().optional(),
+  unitCost: z.number().nonnegative().optional(),
+  taxRate: z.number().nonnegative().optional(),
+  unit: z.string().max(10).optional(),
+  sortOrder: z.number().int().optional(),
+});
+
+// Per D-04: every field optional. Per D-03: PATCH uses the same shape.
+const draftInvoiceSchema = z.object({
+  type: z.enum(['invoice', 'quote', 'credit_note']).optional(),
+  customerId: z.string().uuid().optional(),
+  orderId: z.string().uuid().optional(),
+  issueDate: z.string().optional(),
+  dueDate: z.string().optional(),
+  notes: z.string().optional(),
+  items: z.array(draftItemSchema).optional(),
+});
+
 const invoicesRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('preHandler', fastify.authenticate);
 
@@ -63,6 +87,28 @@ const invoicesRoutes: FastifyPluginAsync = async (fastify) => {
     const { id } = request.params as { id: string };
     const body = updateInvoiceSchema.parse(request.body);
     return invoicesService.update(request.user.tenantId, id, body);
+  });
+
+  // POST /api/v1/invoices/draft — per D-01, D-02, D-04.
+  // Roles: owner, admin, reception (D-07 — technicians excluded).
+  // Returns 201 with full invoice object (D-02) so frontend can store the id.
+  fastify.post('/draft', {
+    preHandler: [fastify.requireRole('owner', 'admin', 'reception')],
+  }, async (request, reply) => {
+    const body = draftInvoiceSchema.parse(request.body);
+    const draft = await invoicesService.createDraft(request.user.tenantId, body);
+    return reply.code(201).send(draft);
+  });
+
+  // PATCH /api/v1/invoices/draft/:id — per D-01, D-03 (partial merge).
+  // Same role gate as POST /draft (D-07).
+  // Returns 200 (default) with updated invoice. 404 if id missing, 400 if invoice exists but is not a draft.
+  fastify.patch('/draft/:id', {
+    preHandler: [fastify.requireRole('owner', 'admin', 'reception')],
+  }, async (request) => {
+    const { id } = request.params as { id: string };
+    const body = draftInvoiceSchema.parse(request.body);
+    return invoicesService.updateDraft(request.user.tenantId, id, body);
   });
 
   fastify.patch('/:id/status', {
