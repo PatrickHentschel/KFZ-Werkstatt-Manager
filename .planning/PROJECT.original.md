@@ -2,11 +2,11 @@
 
 ## What This Is
 
-Multi-tenant workshop management app for automotive repair shops. Manages customers, vehicles, work orders, invoices, appointments, staff, parts inventory. Fastify + Drizzle + PostgreSQL backend, React + Vite frontend.
+Multi-tenant workshop management app for automotive repair shops. Manages customers, vehicles, work orders, invoices, appointments, staff, and parts inventory. Built with Fastify + Drizzle + PostgreSQL backend and React + Vite frontend.
 
 ## Core Value
 
-Workshop owners manage entire operation — customer intake to paid invoice — without losing work in progress.
+Workshop owners can manage their entire operation — from customer intake to paid invoice — without losing work in progress.
 
 ## Requirements
 
@@ -29,8 +29,8 @@ Workshop owners manage entire operation — customer intake to paid invoice — 
 
 - [ ] **DRAFT-01**: Invoice dialog auto-saves to DB as `draft` when user exits (dialog close, page navigation, any dialog leave event)
 - [ ] **DRAFT-02**: Invoices list has "Drafts" tab/filter showing only `status = draft` invoices
-- [ ] **DRAFT-03**: Drafts tab separated from active invoices (sent/paid/cancelled) in UI
-- [ ] **DRAFT-04**: User can resume editing draft invoice from Drafts tab
+- [ ] **DRAFT-03**: Drafts tab separated from active invoices (sent/paid/cancelled) in the UI
+- [ ] **DRAFT-04**: User can resume editing a draft invoice from the Drafts tab
 
 ### Out of Scope
 
@@ -39,7 +39,7 @@ Workshop owners manage entire operation — customer intake to paid invoice — 
 
 ## Context
 
-Brownfield codebase. Invoice schema already has `status` enum with `draft` as default and `type` enum with `invoice`/`quote`/`credit_note`. DB layer requires no changes.
+Brownfield codebase. Invoice schema already has `status` enum with `draft` as default value and `type` enum with `invoice`/`quote`/`credit_note`. DB layer requires no changes.
 
 Key files:
 - `frontend/src/pages/invoices/InvoiceDialog.tsx` — dialog to modify
