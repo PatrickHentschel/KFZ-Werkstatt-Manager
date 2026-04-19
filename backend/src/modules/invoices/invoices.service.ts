@@ -1,4 +1,5 @@
 import { eq, and, sql, or, ilike, inArray } from 'drizzle-orm';
+import crypto from 'crypto';
 import { db } from '../../db';
 import { invoices, invoiceItems, tenants, orders, customers, parts } from '../../db/schema';
 import { errors } from '../../utils/errors';
@@ -182,6 +183,107 @@ export class InvoicesService {
             unitPrice: String(item.unitPrice),
             unitCost: String(item.unitCost ?? 0),
             taxRate: String(item.taxRate),
+            unit: item.unit || null,
+            sortOrder: item.sortOrder ?? idx,
+          }))
+        );
+      }
+    }
+
+    return this.getById(tenantId, id);
+  }
+
+  async createDraft(tenantId: string, data: {
+    type?: 'invoice' | 'quote' | 'credit_note';
+    customerId?: string;
+    orderId?: string;
+    issueDate?: string;
+    dueDate?: string;
+    notes?: string;
+    items?: Array<{ type?: 'labor' | 'part' | 'misc'; description?: string; quantity?: number; unitPrice?: number; unitCost?: number; taxRate?: number; unit?: string; sortOrder?: number }>;
+  }) {
+    // Per D-06: 'DRAFT-' + 8-char UUID segment. Strip dashes first, then take 8 chars.
+    // DO NOT call create() — that increments tenants.invoiceCounter. Drafts MUST NOT consume the counter.
+    const invoiceNumber = `DRAFT-${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
+
+    const [invoice] = await db.insert(invoices).values({
+      tenantId,
+      invoiceNumber,
+      status: 'draft',
+      type: data.type ?? 'invoice',
+      customerId: data.customerId ?? null,
+      orderId: data.orderId,
+      issueDate: data.issueDate ?? null,
+      dueDate: data.dueDate,
+      notes: data.notes,
+    }).returning();
+
+    // Filter items lacking description — invoice_items.description is NOT NULL at DB level.
+    // Empty items array is valid per D-05.
+    if (data.items && data.items.length > 0) {
+      const validItems = data.items.filter(i => i.description && i.description.trim().length > 0);
+      if (validItems.length > 0) {
+        await db.insert(invoiceItems).values(
+          validItems.map((item, idx) => ({
+            invoiceId: invoice.id,
+            type: item.type ?? 'misc',
+            description: item.description!,
+            quantity: String(item.quantity ?? 1),
+            unitPrice: String(item.unitPrice ?? 0),
+            unitCost: String(item.unitCost ?? 0),
+            taxRate: String(item.taxRate ?? 20),
+            unit: item.unit || null,
+            sortOrder: item.sortOrder ?? idx,
+          }))
+        );
+      }
+    }
+
+    return this.getById(tenantId, invoice.id);
+  }
+
+  async updateDraft(tenantId: string, id: string, data: {
+    type?: 'invoice' | 'quote' | 'credit_note';
+    customerId?: string;
+    orderId?: string;
+    issueDate?: string;
+    dueDate?: string;
+    notes?: string;
+    items?: Array<{ type?: 'labor' | 'part' | 'misc'; description?: string; quantity?: number; unitPrice?: number; unitCost?: number; taxRate?: number; unit?: string; sortOrder?: number }>;
+  }) {
+    const existing = await db.query.invoices.findFirst({
+      where: and(eq(invoices.id, id), eq(invoices.tenantId, tenantId)),
+    });
+    if (!existing) throw errors.notFound('Draft');
+    if (existing.status !== 'draft') throw errors.badRequest('Only drafts can be updated via this endpoint');
+
+    await db.update(invoices)
+      .set({
+        type: data.type ?? existing.type,
+        customerId: data.customerId !== undefined ? data.customerId : existing.customerId,
+        orderId: data.orderId !== undefined ? data.orderId : existing.orderId,
+        issueDate: data.issueDate !== undefined ? data.issueDate : existing.issueDate,
+        dueDate: data.dueDate !== undefined ? data.dueDate : existing.dueDate,
+        notes: data.notes !== undefined ? data.notes : existing.notes,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId)));
+
+    // CRITICAL D-03 semantics: items wiped+replaced ONLY if data.items is explicitly provided (not undefined).
+    // A PATCH body without `items` MUST leave existing items untouched.
+    if (data.items !== undefined) {
+      await db.delete(invoiceItems).where(eq(invoiceItems.invoiceId, id));
+      const validItems = data.items.filter(i => i.description && i.description.trim().length > 0);
+      if (validItems.length > 0) {
+        await db.insert(invoiceItems).values(
+          validItems.map((item, idx) => ({
+            invoiceId: id,
+            type: item.type ?? 'misc',
+            description: item.description!,
+            quantity: String(item.quantity ?? 1),
+            unitPrice: String(item.unitPrice ?? 0),
+            unitCost: String(item.unitCost ?? 0),
+            taxRate: String(item.taxRate ?? 20),
             unit: item.unit || null,
             sortOrder: item.sortOrder ?? idx,
           }))
