@@ -474,27 +474,19 @@ None — discussion stayed within phase scope.
 | A6 | `auto-save only triggers if at least one required field has been filled` (DRAFT-04) is enforced by the FRONTEND, not the backend | Phase Requirements | Low — backend is dumb per CONTEXT D-04. If reviewer interprets DRAFT-04 differently, planner must adjust. |
 | A7 | "All fields optional" (D-04) supersedes CLAUDE.md "no migrations needed" because D-04 was decided after CLAUDE.md was written | Schema Constraint Reconciliation | **Medium** — this is the central planning question. Surface to user. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Schema migration vs. require minimum payload (Option A/B/C)**
-   - What we know: DB schema enforces `customer_id NOT NULL` and `issue_date NOT NULL`; CONTEXT D-04 says all fields optional.
-   - What's unclear: User's preference between adding a migration (cleanest) vs. tightening the payload schema (no migration but contradicts D-04).
-   - Recommendation: Add as planning question. Default to Option B (migration) if user does not respond — it is the only path that fully honours D-04.
+   - RESOLVED: Option B (DROP NOT NULL migration) via user decision D-04 — implemented in Plan 01-01.
 
 2. **Should draft items with missing `description` be persisted or filtered out?**
-   - What we know: `invoice_items.description` is `text NOT NULL`. A user mid-typing may have an item with all numeric fields filled but no description yet.
-   - What's unclear: Drop those items silently, or also relax `invoice_items.description` to nullable.
-   - Recommendation: Filter items where `description` is empty/missing during persistence (Code Example 1 already does this). Document in code. If user later wants those items kept, switch to a migration that nulls `description`.
+   - RESOLVED: Filter items with missing description at persistence time — Plan 01-02 Task 1 implements this.
 
 3. **Cleanup of orphaned drafts**
-   - What we know: A user could create dozens of `DRAFT-xxxx` rows by repeatedly opening and closing the dialog without filling anything.
-   - What's unclear: Should there be a cron job to purge empty drafts older than N days?
-   - Recommendation: Out of scope for Phase 1. Note for planner consideration in Phase 4 (UX Feedback) or post-MVP. Not a blocker.
+   - RESOLVED: Out of scope for Phase 1 — defer to post-MVP phase.
 
 4. **Idempotency on POST `/draft`**
-   - What we know: Each POST creates a new row. A flaky network with retry could create two drafts.
-   - What's unclear: Should we accept an optional client-provided idempotency key?
-   - Recommendation: Out of scope for Phase 1. Phase 2 frontend should track the in-flight request and avoid concurrent POSTs (standard React Query pattern via `useMutation`). Not a blocker.
+   - RESOLVED: Out of scope for Phase 1 — Phase 2 frontend prevents concurrent POSTs via `useMutation`.
 
 ## Environment Availability
 
