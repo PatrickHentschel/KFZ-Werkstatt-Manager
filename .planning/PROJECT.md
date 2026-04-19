@@ -37,6 +37,10 @@ Workshop owners manage entire operation — customer intake to paid invoice — 
 - Separate "Angebote" module — handled via `invoice.type = 'quote'` on existing invoice schema
 - Local-only draft persistence (localStorage) — DB-persisted drafts chosen for reliability and shareability
 
+## Current State
+
+Phase 1 complete — backend draft API delivered. `POST /api/v1/invoices/draft` and `PATCH /api/v1/invoices/draft/:id` live. Schema nullable. Frontend (Phase 2) is next.
+
 ## Context
 
 Brownfield codebase. Invoice schema already has `status` enum with `draft` as default and `type` enum with `invoice`/`quote`/`credit_note`. DB layer requires no changes.
@@ -45,8 +49,8 @@ Key files:
 - `frontend/src/pages/invoices/InvoiceDialog.tsx` — dialog to modify
 - `frontend/src/pages/invoices/InvoicesPage.tsx` — list to add Drafts tab
 - `frontend/src/api/invoices.api.ts` — API client
-- `backend/src/modules/invoices/invoices.service.ts` — service layer
-- `backend/src/db/schema/invoices.ts` — schema (draft status already exists)
+- `backend/src/modules/invoices/invoices.service.ts` — service layer (createDraft, updateDraft added)
+- `backend/src/db/schema/invoices.ts` — schema (customerId, issueDate now nullable)
 
 ## Constraints
 
@@ -60,6 +64,7 @@ Key files:
 | DB-persisted drafts (not localStorage) | Survives refresh, accessible from other devices, shareable | — Pending |
 | Reuse existing invoice schema | `status = draft` already exists, no migration needed | ✓ Good |
 | Drafts in separate tab (not mixed list) | Cleaner UX, drafts don't clutter active invoice workflow | — Pending |
+| DRAFT-xxxxxxxx numbering (not sequential) | Drafts must not consume tenant invoice counter | ✓ Validated in Phase 1 |
 
 ---
-*Last updated: 2026-04-17 after initialization*
+*Last updated: 2026-04-19 after Phase 1 complete*
