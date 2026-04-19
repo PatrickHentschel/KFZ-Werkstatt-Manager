@@ -30,7 +30,7 @@ Decimal phases appear between surrounding integers in numeric order.
   4. Endpoint callable from frontend via standard fetch/axios, returns draft id
 **Plans**: 2 plans
 - [x] 01-01-PLAN.md — Schema migration: drop NOT NULL on `invoices.customer_id` and `invoices.issue_date` (generate + apply Drizzle migration)
-- [ ] 01-02-PLAN.md — Add `createDraft`/`updateDraft` to `InvoicesService` and `POST`/`PATCH /draft` routes with role enforcement
+- [x] 01-02-PLAN.md — Add `createDraft`/`updateDraft` to `InvoicesService` and `POST`/`PATCH /draft` routes with role enforcement
 
 ### Phase 2: Auto-Save Core
 **Goal**: Users never lose in-progress invoice work — closing dialog or navigating away auto-saves draft
