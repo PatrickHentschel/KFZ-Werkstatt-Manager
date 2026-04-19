@@ -29,7 +29,7 @@ Decimal phases appear between surrounding integers in numeric order.
   3. Second upsert call for same draft updates it, not duplicates
   4. Endpoint callable from frontend via standard fetch/axios, returns draft id
 **Plans**: 2 plans
-- [ ] 01-01-PLAN.md — Schema migration: drop NOT NULL on `invoices.customer_id` and `invoices.issue_date` (generate + apply Drizzle migration)
+- [x] 01-01-PLAN.md — Schema migration: drop NOT NULL on `invoices.customer_id` and `invoices.issue_date` (generate + apply Drizzle migration)
 - [ ] 01-02-PLAN.md — Add `createDraft`/`updateDraft` to `InvoicesService` and `POST`/`PATCH /draft` routes with role enforcement
 
 ### Phase 2: Auto-Save Core
