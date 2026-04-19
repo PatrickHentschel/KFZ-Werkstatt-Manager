@@ -614,30 +614,34 @@ export default function App() {
 | A8 | The DELETE endpoint is not in Phase 1 and must be added in this phase | Pitfall 6, Example 6 | **High confidence** — [VERIFIED: grep over `backend/src/modules/invoices/invoices.routes.ts` shows only POST/PATCH for `/draft`, no DELETE]. |
 | A9 | CONTEXT D-06 "use `useBlocker`" assumes the router already supports it | Summary | **Medium** — the CONTEXT author may not have known the project uses `BrowserRouter`. Surface to user: either migrate router or switch to fallback. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **How does the user want to resolve the `useBlocker` / `BrowserRouter` incompatibility?**
    - What we know: `useBlocker` requires data router; current app uses declarative `BrowserRouter`.
    - What's unclear: Whether user prefers router migration (Option 1), private-API workaround (Option 2), or dropping navigation-save (Option 3).
    - Recommendation: Surface as the first planning question. Default to Option 1 (migration). A ~40-line refactor of `App.tsx` is the cleanest path.
+   - **RESOLVED:** Option 1 selected — Plan 02-02 migrates `App.tsx` to `createBrowserRouter` + `RouterProvider`. All existing routes preserved.
 
 2. **Does the Abbrechen button route through `onOpenChange` or call `onClose` directly?**
    - What we know: Current code calls `onClose()` directly (verified).
    - What's unclear: Whether the planner should unify both paths through a single save handler or leave them divergent.
    - Recommendation: Unify. Make Abbrechen invoke the same `handleCloseRequested` as `onOpenChange(false)`. Simpler, fewer bugs.
+   - **RESOLVED:** Unified — Plan 02-03 Task 1 Edit 8 routes Abbrechen through `handleCloseRequested`, same handler as `onOpenChange(false)`.
 
 3. **What form-data shape should `performDraftSave` send?**
    - What we know: Phase 1 accepts partial payloads with all fields optional.
    - What's unclear: Whether to send ALL form fields (even empty strings) or only touched fields. Sending all works; the backend overwrites only supplied fields (PATCH semantics). Sending only touched fields is slightly more efficient but requires plumbing react-hook-form's dirty-fields API.
    - Recommendation: Send all fields — simpler, no-op semantically, matches how existing `updateInvoiceMutation` works.
+   - **RESOLVED:** All fields sent via `getValues()` — Plan 02-03 Task 1 uses full-form payload (simpler, PATCH semantics handle no-ops).
 
 4. **Should the Phase 2 plan also explicitly expose a "download drafts" button or is that pure Phase 3?**
-   - RESOLVED: Pure Phase 3 (DRAFT-05 through DRAFT-08 are Phase 3/4 scope). Phase 2 creates the drafts; Phase 3 makes them viewable/clickable.
+   - **RESOLVED:** Pure Phase 3 (DRAFT-05 through DRAFT-08 are Phase 3/4 scope). Phase 2 creates the drafts; Phase 3 makes them viewable/clickable.
 
 5. **How do we signal save state to the user in Phase 2?**
    - What we know: UI-SPEC explicitly forbids a "Wird gespeichert..." spinner in this phase (that's Phase 4).
    - What's unclear: Whether the failure toast suffices for the "Save failure shows indication" success criterion (Phase 2 success criterion #4).
    - Recommendation: The destructive toast + unchanged visible form (the user's data hasn't been wiped) satisfies the criterion. No additional affordance.
+   - **RESOLVED:** Destructive toast on failure satisfies Phase 2 SC-4 per UI-SPEC. Spinner/indicator deferred to Phase 4 (Plan 02-03 implements exact toast copy from UI-SPEC).
 
 ## Environment Availability
 
