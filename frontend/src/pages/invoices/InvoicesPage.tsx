@@ -75,6 +75,7 @@ export function InvoicesPage() {
         pageSize: 20,
         search: search || undefined,
         status: activeTab !== 'all' ? activeTab : undefined,
+        statuses: activeTab === 'all' ? 'sent,paid,cancelled' : undefined,
       }),
   });
 
