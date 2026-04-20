@@ -111,6 +111,15 @@ const invoicesRoutes: FastifyPluginAsync = async (fastify) => {
     return invoicesService.updateDraft(request.user.tenantId, id, body);
   });
 
+  // DELETE /api/v1/invoices/draft/:id — removes draft + items. 404 if not found, 400 if not a draft.
+  fastify.delete('/draft/:id', {
+    preHandler: [fastify.requireRole('owner', 'admin', 'reception')],
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    await invoicesService.deleteDraft(request.user.tenantId, id);
+    return reply.code(204).send();
+  });
+
   fastify.patch('/:id/status', {
     preHandler: [fastify.requireRole('owner', 'admin')],
   }, async (request) => {
