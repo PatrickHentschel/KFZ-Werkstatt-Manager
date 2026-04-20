@@ -294,6 +294,17 @@ export class InvoicesService {
     return this.getById(tenantId, id);
   }
 
+  async deleteDraft(tenantId: string, id: string) {
+    const existing = await db.query.invoices.findFirst({
+      where: and(eq(invoices.id, id), eq(invoices.tenantId, tenantId)),
+    });
+    if (!existing) throw errors.notFound('Draft');
+    if (existing.status !== 'draft') throw errors.badRequest('Only drafts can be deleted via this endpoint');
+
+    await db.delete(invoiceItems).where(eq(invoiceItems.invoiceId, id));
+    await db.delete(invoices).where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId)));
+  }
+
   async updateStatus(tenantId: string, id: string, status: InvoiceStatus) {
     const updates: Partial<typeof invoices.$inferInsert> = { status, updatedAt: new Date() };
     if (status === 'paid') updates.paidAt = new Date();
