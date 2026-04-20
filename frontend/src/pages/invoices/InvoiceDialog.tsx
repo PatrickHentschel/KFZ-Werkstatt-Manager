@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -13,7 +13,7 @@ import { customersApi, type Customer } from '@/api/customers.api';
 import { ordersApi } from '@/api/orders.api';
 import { partsApi } from '@/api/parts.api';
 import { staffApi } from '@/api/staff.api';
-import { invoicesApi, type Invoice } from '@/api/invoices.api';
+import { invoicesApi, type Invoice, type DraftInvoicePayload } from '@/api/invoices.api';
 import { settingsApi } from '@/api/settings.api';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -56,12 +56,13 @@ export function InvoiceDialog({ open, onClose, invoice }: Props) {
   const [step, setStep] = useState(1);
   const [customerSearch, setCustomerSearch] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const draftIdRef = useRef<string | null>(null);
 
   const [partPickerIdx, setPartPickerIdx] = useState<number | null>(null);
   const [partPickerSearch, setPartPickerSearch] = useState('');
   const [debouncedPartSearch, setDebouncedPartSearch] = useState('');
 
-  const { register, handleSubmit, control, reset, watch, setValue, formState: { errors } } = useForm<InvoiceForm>({
+  const { register, handleSubmit, control, reset, watch, setValue, getValues, formState: { errors } } = useForm<InvoiceForm>({
     resolver: zodResolver(invoiceSchema),
     defaultValues: {
       type: 'invoice',
@@ -87,6 +88,7 @@ export function InvoiceDialog({ open, onClose, invoice }: Props) {
 
   useEffect(() => {
     if (!open) {
+      draftIdRef.current = null;
       setStep(1);
       setCustomerSearch('');
       setSelectedCustomer(null);
@@ -98,6 +100,9 @@ export function InvoiceDialog({ open, onClose, invoice }: Props) {
       setPartPickerIdx(null);
       setPartPickerSearch('');
     } else if (invoice) {
+      if (invoice.status === 'draft') {
+        draftIdRef.current = invoice.id;
+      }
       setStep(2);
       setSelectedCustomer({
         ...(invoice.customer as any),
@@ -183,6 +188,44 @@ export function InvoiceDialog({ open, onClose, invoice }: Props) {
     }
   };
 
+  const performDraftSave = async () => {
+    if (!selectedCustomer) return;
+    const values = getValues();
+    const payload: DraftInvoicePayload = {
+      customerId: selectedCustomer.id,
+      type: values.type,
+      issueDate: values.issueDate || undefined,
+      dueDate: values.dueDate || undefined,
+      notes: values.notes || undefined,
+      orderId: values.orderId || undefined,
+      items: values.items.map((item, idx) => ({
+        type: item.type,
+        description: item.description,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        unitCost: (item as any).unitCost,
+        taxRate: item.taxRate,
+        unit: item.unit,
+        sortOrder: idx,
+      })),
+    };
+    try {
+      if (draftIdRef.current) {
+        await invoicesApi.updateDraft(draftIdRef.current, payload);
+      } else {
+        const res = await invoicesApi.createDraft(payload);
+        draftIdRef.current = res.data.id;
+      }
+    } catch {
+      toast({ variant: 'destructive', title: 'Entwurf konnte nicht gespeichert werden' });
+    }
+  };
+
+  const handleClose = () => {
+    void performDraftSave();
+    onClose();
+  };
+
   const onMutationError = (err: any, fallback: string) =>
     toast({ variant: 'destructive', title: 'Fehler', description: err.response?.data?.message || fallback });
 
@@ -216,6 +259,9 @@ export function InvoiceDialog({ open, onClose, invoice }: Props) {
         items: data.items.map((item, idx) => ({ ...item, sortOrder: idx + 1 })),
       }),
     onSuccess: () => {
+      if (draftIdRef.current) {
+        void invoicesApi.deleteDraft(draftIdRef.current);
+      }
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       toast({ title: 'Rechnung erstellt' });
       onClose();
@@ -238,7 +284,7 @@ export function InvoiceDialog({ open, onClose, invoice }: Props) {
   );
 
   return (
-    <Dialog.Root open={open} onOpenChange={(o) => !o && onClose()}>
+    <Dialog.Root open={open} onOpenChange={(o) => !o && handleClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
         <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-2xl max-h-[90vh] -translate-x-1/2 -translate-y-1/2 rounded-lg bg-background shadow-lg flex flex-col">
@@ -617,9 +663,9 @@ export function InvoiceDialog({ open, onClose, invoice }: Props) {
               variant="outline"
               onClick={() => {
                 if (invoice && step === 2) {
-                  onClose();
+                  handleClose();
                 } else {
-                  step > 1 ? setStep((s: number) => s - 1) : onClose();
+                  step > 1 ? setStep((s: number) => s - 1) : handleClose();
                 }
               }}
             >
