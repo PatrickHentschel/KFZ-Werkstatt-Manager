@@ -19,6 +19,25 @@ export interface Invoice {
   createdAt: string; updatedAt: string;
 }
 
+export interface DraftInvoicePayload {
+  type?: 'invoice' | 'quote' | 'credit_note';
+  customerId?: string;
+  orderId?: string;
+  issueDate?: string;
+  dueDate?: string;
+  notes?: string;
+  items?: Array<{
+    type?: 'labor' | 'part' | 'misc';
+    description?: string;
+    quantity?: number;
+    unitPrice?: number;
+    unitCost?: number;
+    taxRate?: number;
+    unit?: string;
+    sortOrder?: number;
+  }>;
+}
+
 export const invoicesApi = {
   list: (params?: { page?: number; pageSize?: number; status?: string; statuses?: string; search?: string }) =>
     apiClient.get<PaginatedResponse<Invoice>>('/invoices', { params }),
@@ -31,4 +50,7 @@ export const invoicesApi = {
     apiClient.patch<Invoice>(`/invoices/${id}/status`, { status }),
   getPdf: (id: string) => apiClient.get(`/invoices/${id}/pdf`, { responseType: 'blob' }),
   send: (id: string) => apiClient.post(`/invoices/${id}/send`),
+  createDraft: (data: DraftInvoicePayload) => apiClient.post<Invoice>('/invoices/draft', data),
+  updateDraft: (id: string, data: DraftInvoicePayload) => apiClient.patch<Invoice>(`/invoices/draft/${id}`, data),
+  deleteDraft: (id: string) => apiClient.delete(`/invoices/draft/${id}`),
 };
