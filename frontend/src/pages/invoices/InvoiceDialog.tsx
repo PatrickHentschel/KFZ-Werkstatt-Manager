@@ -4,6 +4,7 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import * as Dialog from '@radix-ui/react-dialog';
+import { useBlocker } from 'react-router-dom';
 import { X, Plus, Trash2, Search, ChevronRight, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -225,6 +226,21 @@ export function InvoiceDialog({ open, onClose, invoice }: Props) {
     void performDraftSave();
     onClose();
   };
+
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      open &&
+      !!selectedCustomer &&
+      currentLocation.pathname !== nextLocation.pathname &&
+      nextLocation.pathname !== '/login'
+  );
+
+  useEffect(() => {
+    if (blocker.state !== 'blocked') return;
+    void performDraftSave();
+    blocker.proceed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blocker.state]);
 
   const onMutationError = (err: any, fallback: string) =>
     toast({ variant: 'destructive', title: 'Fehler', description: err.response?.data?.message || fallback });
