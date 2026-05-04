@@ -41,7 +41,11 @@ Decimal phases appear between surrounding integers in numeric order.
   2. Navigating away while dialog open triggers draft save before navigation completes
   3. Rapid typing doesn't fire network request per keystroke — saves debounced
   4. Save failure shows indication — no silent data loss
-**Plans**: TBD
+**Plans**: 4 plans
+- [ ] 02-01-PLAN.md — Backend DELETE /draft/:id endpoint + frontend invoicesApi draft methods (createDraft/updateDraft/deleteDraft)
+- [ ] 02-02-PLAN.md — Migrate App.tsx to createBrowserRouter + RouterProvider (unblocks useBlocker)
+- [ ] 02-03-PLAN.md — Close-time draft save in InvoiceDialog + finalize cleanup + 'Alle' tab excludes drafts
+- [ ] 02-04-PLAN.md — Navigation-away draft save via useBlocker in InvoiceDialog
 **UI hint**: yes
 
 ### Phase 3: Drafts Tab
