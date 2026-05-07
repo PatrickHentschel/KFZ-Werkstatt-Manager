@@ -78,6 +78,48 @@
       "when": 1776583796689,
       "tag": "0010_messy_radioactive_man",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1778025600000,
+      "tag": "0011_de_market_p1",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1778198400000,
+      "tag": "0012_invoice_p14_ustg",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1778284800000,
+      "tag": "0013_customer_salutation_address",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1778371200000,
+      "tag": "0014_vehicle_kba_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1778457600000,
+      "tag": "0015_invoice_storno",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1778544000000,
+      "tag": "0016_counter_default_zero",
+      "breakpoints": true
     }
   ]
 }

@@ -28,14 +28,7 @@ const partsRoutes: FastifyPluginAsync = async (fastify) => {
     preHandler: [fastify.requireRole('owner', 'admin')],
   }, async (request, reply) => {
     const body = createPartSchema.parse(request.body);
-    const part = await partsService.create(request.user.tenantId, {
-      ...body,
-      stockQuantity: String(body.stockQuantity),
-      minStock: String(body.minStock),
-      purchasePrice: String(body.purchasePrice),
-      salePrice: String(body.salePrice),
-      taxRate: String(body.taxRate),
-    } as any);
+    const part = await partsService.create(request.user.tenantId, body as any);
     return reply.code(201).send(part);
   });
   fastify.patch('/:id', {

@@ -1,13 +1,29 @@
 import { apiClient } from './client';
 import type { PaginatedResponse } from './customers.api';
 
+export type Transmission = 'manual' | 'automatic' | 'semi_automatic';
+
 export interface Vehicle {
-  id: string; tenantId: string; customerId: string;
-  licensePlate: string; vin?: string; make: string; model: string;
-  year?: number; color?: string; fuelType?: string; mileage?: number;
-  nextTuvDate?: string; nextPickerlDate?: string; notes?: string;
+  id: string;
+  tenantId: string;
+  customerId: string;
+  licensePlate: string;
+  vin?: string;
+  hsn?: string;
+  tsn?: string;
+  make: string;
+  model: string;
+  firstRegistration?: string | null;
+  color?: string;
+  engineDisplacement?: number;
+  fuelType?: string;
+  transmission?: Transmission;
+  mileage: number;
+  nextTuvDate?: string;
+  notes?: string;
   customer?: { id: string; firstName?: string; lastName?: string; companyName?: string; };
-  createdAt: string; updatedAt: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export const vehiclesApi = {

@@ -67,7 +67,7 @@ export function LoginPage() {
               <Input
                 id="email"
                 type="email"
-                placeholder="name@werkstatt.at"
+                placeholder="name@werkstatt.de"
                 {...register('email')}
               />
               {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}

@@ -62,6 +62,12 @@ export const invoicesRelations = relations(invoices, ({ one, many }) => ({
   customer: one(customers, { fields: [invoices.customerId], references: [customers.id] }),
   order: one(orders, { fields: [invoices.orderId], references: [orders.id] }),
   items: many(invoiceItems),
+  // Self-relation: Stornorechnung → Original
+  cancelsInvoice: one(invoices, {
+    fields: [invoices.cancelsInvoiceId],
+    references: [invoices.id],
+    relationName: 'cancels',
+  }),
 }));
 
 export const invoiceItemsRelations = relations(invoiceItems, ({ one }) => ({

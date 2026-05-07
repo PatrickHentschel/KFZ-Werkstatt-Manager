@@ -13,6 +13,9 @@ import { customersApi, type Customer } from '@/api/customers.api';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
+const HSN_RE = /^[0-9]{4}$/;
+const TSN_RE = /^[A-Z0-9]{3}$/;
+
 const nanToUndefined = (v: unknown) =>
   typeof v === 'number' && isNaN(v) ? undefined : v;
 
@@ -20,11 +23,15 @@ const schema = z.object({
   licensePlate: z.string().min(1, 'Pflichtfeld'),
   make: z.string().min(1, 'Pflichtfeld'),
   model: z.string().min(1, 'Pflichtfeld'),
-  vin: z.string().optional(),
-  year: z.preprocess(nanToUndefined, z.number().int().positive().optional()),
+  vin: z.string().optional().refine(v => !v || v.length === 17, 'FIN muss 17 Zeichen haben'),
+  hsn: z.string().optional().refine(v => !v || HSN_RE.test(v), 'HSN: 4 Ziffern'),
+  tsn: z.string().optional().refine(v => !v || TSN_RE.test(v.toUpperCase()), 'TSN: 3 alphanumerisch'),
+  firstRegistration: z.string().optional(),
   color: z.string().optional(),
   fuelType: z.string().optional(),
-  mileage: z.preprocess(nanToUndefined, z.number().int().nonnegative().optional()),
+  transmission: z.string().optional(),
+  // KM-Stand: Pflicht
+  mileage: z.preprocess(nanToUndefined, z.number({ required_error: 'Pflichtfeld' }).int().nonnegative()),
   nextTuvDate: z.string().optional(),
   notes: z.string().optional(),
 });
@@ -52,7 +59,6 @@ export function VehicleDialog({ open, onClose, initialData }: Props) {
     resolver: zodResolver(schema),
   });
 
-  // Pre-fill form and pre-select customer when editing
   useEffect(() => {
     if (open && initialData) {
       setSelectedCustomerId(initialData.customerId);
@@ -61,10 +67,13 @@ export function VehicleDialog({ open, onClose, initialData }: Props) {
         make: initialData.make,
         model: initialData.model,
         vin: initialData.vin || '',
-        year: initialData.year,
+        hsn: initialData.hsn || '',
+        tsn: initialData.tsn || '',
+        firstRegistration: initialData.firstRegistration || '',
         color: initialData.color || '',
         fuelType: initialData.fuelType || '',
-        mileage: initialData.mileage,
+        transmission: initialData.transmission || '',
+        mileage: initialData.mileage ?? 0,
         nextTuvDate: initialData.nextTuvDate || '',
         notes: initialData.notes || '',
       });
@@ -76,8 +85,13 @@ export function VehicleDialog({ open, onClose, initialData }: Props) {
         make: '',
         model: '',
         vin: '',
+        hsn: '',
+        tsn: '',
+        firstRegistration: '',
         color: '',
         fuelType: '',
+        transmission: '',
+        mileage: undefined as any,
         nextTuvDate: '',
         notes: '',
       });
@@ -93,10 +107,20 @@ export function VehicleDialog({ open, onClose, initialData }: Props) {
   const mutation = useMutation({
     mutationFn: (data: FormData) => {
       if (!selectedCustomerId) throw new Error('Kein Kunde ausgewählt');
-      if (initialData) {
-        return vehiclesApi.update(initialData.id, data);
-      }
-      return vehiclesApi.create({ ...data, customerId: selectedCustomerId });
+      // Normalize: HSN/TSN uppercase, leere strings → undefined
+      const payload = {
+        ...data,
+        vin: data.vin || undefined,
+        hsn: data.hsn || undefined,
+        tsn: data.tsn ? data.tsn.toUpperCase() : undefined,
+        firstRegistration: data.firstRegistration || undefined,
+        fuelType: data.fuelType || undefined,
+        transmission: data.transmission || undefined,
+        nextTuvDate: data.nextTuvDate || undefined,
+      };
+      return initialData
+        ? vehiclesApi.update(initialData.id, payload)
+        : vehiclesApi.create({ ...payload, customerId: selectedCustomerId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vehicles'] });
@@ -121,7 +145,6 @@ export function VehicleDialog({ open, onClose, initialData }: Props) {
         <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
         <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-3xl -translate-x-1/2 -translate-y-1/2 rounded-lg bg-background shadow-lg flex flex-col max-h-[85vh]">
 
-          {/* Header */}
           <div className="flex items-center justify-between p-6 border-b shrink-0">
             <Dialog.Title className="text-lg font-semibold">
               {initialData ? 'Fahrzeug bearbeiten' : 'Neues Fahrzeug'}
@@ -131,7 +154,6 @@ export function VehicleDialog({ open, onClose, initialData }: Props) {
             </Dialog.Close>
           </div>
 
-          {/* Scrollable body */}
           <form
             id="vehicle-form"
             onSubmit={handleSubmit((d) => mutation.mutate(d))}
@@ -195,78 +217,81 @@ export function VehicleDialog({ open, onClose, initialData }: Props) {
                 )}
               </div>
 
-              {/* Required vehicle fields */}
+              {/* Required */}
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-1">
-                  <Label>
-                    Kennzeichen <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    placeholder="W 12345 AB"
-                    className="font-mono uppercase"
-                    {...register('licensePlate')}
-                  />
-                  {errors.licensePlate && (
-                    <p className="text-xs text-destructive">{errors.licensePlate.message}</p>
-                  )}
+                  <Label>Kennzeichen <span className="text-destructive">*</span></Label>
+                  <Input placeholder="B-AB 1234" className="font-mono uppercase" {...register('licensePlate')} />
+                  {errors.licensePlate && <p className="text-xs text-destructive">{errors.licensePlate.message}</p>}
                 </div>
-
                 <div className="space-y-1">
-                  <Label>
-                    Marke <span className="text-destructive">*</span>
-                  </Label>
+                  <Label>Marke <span className="text-destructive">*</span></Label>
                   <Input placeholder="VW" {...register('make')} />
-                  {errors.make && (
-                    <p className="text-xs text-destructive">{errors.make.message}</p>
-                  )}
+                  {errors.make && <p className="text-xs text-destructive">{errors.make.message}</p>}
                 </div>
-
                 <div className="space-y-1">
-                  <Label>
-                    Modell <span className="text-destructive">*</span>
-                  </Label>
+                  <Label>Modell <span className="text-destructive">*</span></Label>
                   <Input placeholder="Golf" {...register('model')} />
-                  {errors.model && (
-                    <p className="text-xs text-destructive">{errors.model.message}</p>
-                  )}
+                  {errors.model && <p className="text-xs text-destructive">{errors.model.message}</p>}
                 </div>
               </div>
 
-              {/* Optional fields */}
-              <div className="space-y-1">
-                <Label>FIN / VIN</Label>
-                <Input
-                  placeholder="WVW ZZZ 1KZ AW 123456"
-                  className="font-mono uppercase"
-                  {...register('vin')}
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
+              {/* HSN/TSN + FIN */}
+              <div className="grid grid-cols-[100px_100px_1fr] gap-4">
                 <div className="space-y-1">
-                  <Label>Baujahr</Label>
+                  <Label>HSN</Label>
+                  <Input placeholder="0603" maxLength={4} {...register('hsn')} />
+                  {errors.hsn && <p className="text-xs text-destructive">{errors.hsn.message}</p>}
+                </div>
+                <div className="space-y-1">
+                  <Label>TSN</Label>
+                  <Input placeholder="AUC" maxLength={3} className="uppercase" {...register('tsn')} />
+                  {errors.tsn && <p className="text-xs text-destructive">{errors.tsn.message}</p>}
+                </div>
+                <div className="space-y-1">
+                  <Label>FIN / VIN</Label>
+                  <Input
+                    placeholder="WVWZZZ1KZAW123456"
+                    className="font-mono uppercase"
+                    maxLength={17}
+                    {...register('vin')}
+                  />
+                  {errors.vin && <p className="text-xs text-destructive">{errors.vin.message}</p>}
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground -mt-3">
+                HSN/TSN aus dem Fahrzeugschein (Felder 2.1 / 2.2). KBA-Suche folgt.
+              </p>
+
+              {/* KM (Pflicht) + Erstzulassung */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label>Kilometerstand <span className="text-destructive">*</span></Label>
                   <Input
                     type="number"
-                    placeholder="2018"
-                    min={1900}
-                    max={new Date().getFullYear() + 1}
-                    {...register('year', { valueAsNumber: true })}
+                    placeholder="125000"
+                    min={0}
+                    {...register('mileage', { valueAsNumber: true })}
                   />
-                  {errors.year && (
-                    <p className="text-xs text-destructive">{errors.year.message}</p>
-                  )}
+                  {errors.mileage && <p className="text-xs text-destructive">{errors.mileage.message}</p>}
                 </div>
+                <div className="space-y-1">
+                  <Label>Erstzulassung</Label>
+                  <Input type="date" {...register('firstRegistration')} />
+                </div>
+              </div>
 
+              {/* Optional: Farbe, Kraftstoff, Getriebe, HU */}
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <Label>Farbe</Label>
                   <Input placeholder="Silber" {...register('color')} />
                 </div>
-
                 <div className="space-y-1">
                   <Label>Kraftstoff</Label>
                   <select
                     {...register('fuelType')}
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   >
                     <option value="">— bitte wählen —</option>
                     <option value="benzin">Benzin</option>
@@ -278,22 +303,20 @@ export function VehicleDialog({ open, onClose, initialData }: Props) {
                     <option value="sonstige">Sonstige</option>
                   </select>
                 </div>
-
                 <div className="space-y-1">
-                  <Label>Kilometerstand</Label>
-                  <Input
-                    type="number"
-                    placeholder="125000"
-                    min={0}
-                    {...register('mileage', { valueAsNumber: true })}
-                  />
-                  {errors.mileage && (
-                    <p className="text-xs text-destructive">{errors.mileage.message}</p>
-                  )}
+                  <Label>Getriebe</Label>
+                  <select
+                    {...register('transmission')}
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    <option value="">— bitte wählen —</option>
+                    <option value="manual">Schaltgetriebe</option>
+                    <option value="automatic">Automatik</option>
+                    <option value="semi_automatic">Halbautomatik / DSG</option>
+                  </select>
                 </div>
-
                 <div className="space-y-1">
-                  <Label>Nächste HU / TÜV</Label>
+                  <Label>Nächste HU / AU</Label>
                   <Input type="date" {...register('nextTuvDate')} />
                 </div>
               </div>
@@ -305,7 +328,6 @@ export function VehicleDialog({ open, onClose, initialData }: Props) {
             </div>
           </form>
 
-          {/* Footer */}
           <div className="flex justify-end gap-2 p-6 border-t shrink-0">
             <Button type="button" variant="outline" onClick={onClose}>
               Abbrechen

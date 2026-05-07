@@ -23,12 +23,7 @@ const staffRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.post('/', async (request, reply) => {
     const body = createStaffSchema.parse(request.body);
-    const member = await staffService.create(request.user.tenantId, {
-      ...body,
-      hourlyRate: body.hourlyRate ? String(body.hourlyRate) : undefined,
-      awRate: body.awRate ? String(body.awRate) : undefined,
-      costRate: body.costRate ? String(body.costRate) : undefined,
-    } as any);
+    const member = await staffService.create(request.user.tenantId, body as any);
     return reply.code(201).send(member);
   });
 

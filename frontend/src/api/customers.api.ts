@@ -1,11 +1,28 @@
 import { apiClient } from './client';
 
+export type Salutation = 'herr' | 'frau' | 'divers';
+
 export interface Customer {
-  id: string; tenantId: string; type: 'private' | 'business';
-  firstName?: string; lastName?: string; companyName?: string;
-  email?: string; phone?: string; mobile?: string;
-  address?: string; city?: string; postalCode?: string; country: string;
-  taxId?: string; notes?: string; createdAt: string; updatedAt: string;
+  id: string;
+  tenantId: string;
+  type: 'private' | 'business';
+  salutation?: Salutation | null;
+  firstName?: string;
+  lastName?: string;
+  companyName?: string;
+  birthDate?: string | null;
+  email?: string;
+  phone?: string;
+  mobile?: string;
+  street?: string;
+  houseNumber?: string;
+  city?: string;
+  postalCode?: string;
+  country: string;
+  taxId?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface PaginatedResponse<T> { data: T[]; total: number; page: number; pageSize: number; totalPages: number; }

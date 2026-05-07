@@ -305,7 +305,7 @@ export function OrderDetailSheet({ orderId, onClose }: Props) {
                       {order.mileageIn && (
                         <div className="flex gap-2">
                           <span className="text-muted-foreground w-32 shrink-0">Km Eingang</span>
-                          <span>{order.mileageIn.toLocaleString('de-AT')} km</span>
+                          <span>{order.mileageIn.toLocaleString('de-DE')} km</span>
                         </div>
                       )}
                       {order.notes && (
@@ -325,7 +325,7 @@ export function OrderDetailSheet({ orderId, onClose }: Props) {
                       )}
                       <div className="flex gap-2">
                         <span className="text-muted-foreground w-32 shrink-0">Erstellt</span>
-                        <span>{new Date(order.createdAt).toLocaleDateString('de-AT')}</span>
+                        <span>{new Date(order.createdAt).toLocaleDateString('de-DE')}</span>
                       </div>
                     </div>
 
@@ -356,14 +356,14 @@ export function OrderDetailSheet({ orderId, onClose }: Props) {
                                 </td>
                                 <td className="px-3 py-2">{item.description}</td>
                                 <td className="px-3 py-2 text-right tabular-nums">
-                                  {Number(item.quantity).toLocaleString('de-AT')}
+                                  {Number(item.quantity).toLocaleString('de-DE')}
                                   {item.unit && <span className="ml-1 text-muted-foreground text-xs">{item.unit}</span>}
                                 </td>
                                 <td className="px-3 py-2 text-right tabular-nums">
-                                  {Number(item.unitPrice).toLocaleString('de-AT', { style: 'currency', currency: 'EUR' })}
+                                  {Number(item.unitPrice).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
                                 </td>
                                 <td className="px-3 py-2 text-right tabular-nums font-medium">
-                                  {(Number(item.quantity) * Number(item.unitPrice)).toLocaleString('de-AT', {
+                                  {(Number(item.quantity) * Number(item.unitPrice)).toLocaleString('de-DE', {
                                     style: 'currency',
                                     currency: 'EUR',
                                   })}
@@ -376,13 +376,13 @@ export function OrderDetailSheet({ orderId, onClose }: Props) {
                           <span className="text-muted-foreground">
                             Netto:{' '}
                             <span className="font-medium text-foreground">
-                              {totalNet.toLocaleString('de-AT', { style: 'currency', currency: 'EUR' })}
+                              {totalNet.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
                             </span>
                           </span>
                           <span className="text-muted-foreground">
                             Brutto:{' '}
                             <span className="font-medium text-foreground">
-                              {totalGross.toLocaleString('de-AT', { style: 'currency', currency: 'EUR' })}
+                              {totalGross.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
                             </span>
                           </span>
                         </div>
@@ -415,7 +415,7 @@ export function OrderDetailSheet({ orderId, onClose }: Props) {
                                   {entry.staff.firstName} {entry.staff.lastName}
                                 </span>
                                 <span className="text-xs text-muted-foreground">
-                                  {new Date(entry.startTime).toLocaleDateString('de-AT')}
+                                  {new Date(entry.startTime).toLocaleDateString('de-DE')}
                                 </span>
                                 <span className="flex items-center gap-1 text-xs text-muted-foreground">
                                   <Clock className="h-3 w-3" />

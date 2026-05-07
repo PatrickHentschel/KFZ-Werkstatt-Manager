@@ -13,8 +13,12 @@ const invoiceItemSchema = z.object({
   description: z.string(),
   quantity: z.number().positive(),
   unitPrice: z.number().nonnegative(),
+  unitCost: z.number().nonnegative().optional(),
   taxRate: z.number().nonnegative(),
   unit: z.string().max(10).optional(),
+  serviceDate: z.string().nullable().optional(),
+  discountAmount: z.number().nonnegative().optional(),
+  discountPercent: z.number().nonnegative().max(100).optional(),
   sortOrder: z.number().int().optional(),
 });
 
@@ -22,23 +26,27 @@ const createInvoiceSchema = z.object({
   type: z.enum(['invoice', 'quote', 'credit_note']).default('invoice'),
   customerId: z.string().uuid(),
   orderId: z.string().uuid().optional(),
-  issueDate: z.string(),
-  dueDate: z.string().optional(),
+  serviceDate: z.string().optional(),
+  // dueDate: Pflicht. issueDate wird IMMER server-seitig gesetzt.
+  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fälligkeitsdatum ist Pflicht'),
   notes: z.string().optional(),
+  skontoPercent: z.number().nonnegative().max(100).optional(),
+  skontoDays: z.number().int().nonnegative().optional(),
   items: z.array(invoiceItemSchema),
 });
 
 const updateInvoiceSchema = z.object({
   type: z.enum(['invoice', 'quote', 'credit_note']).optional(),
-  issueDate: z.string().optional(),
+  serviceDate: z.string().nullable().optional(),
   dueDate: z.string().optional(),
   notes: z.string().optional(),
   orderId: z.string().uuid().optional(),
+  skontoPercent: z.number().nonnegative().max(100).nullable().optional(),
+  skontoDays: z.number().int().nonnegative().nullable().optional(),
   items: z.array(invoiceItemSchema).optional(),
 });
 
 // Per-item schema for drafts — every field optional so half-typed items round-trip.
-// Note: items missing `description` are filtered server-side (invoice_items.description is NOT NULL).
 const draftItemSchema = z.object({
   type: z.enum(['labor', 'part', 'misc']).optional(),
   description: z.string().optional(),
@@ -47,17 +55,21 @@ const draftItemSchema = z.object({
   unitCost: z.number().nonnegative().optional(),
   taxRate: z.number().nonnegative().optional(),
   unit: z.string().max(10).optional(),
+  serviceDate: z.string().nullable().optional(),
+  discountAmount: z.number().nonnegative().optional(),
+  discountPercent: z.number().nonnegative().max(100).optional(),
   sortOrder: z.number().int().optional(),
 });
 
-// Per D-04: every field optional. Per D-03: PATCH uses the same shape.
 const draftInvoiceSchema = z.object({
   type: z.enum(['invoice', 'quote', 'credit_note']).optional(),
   customerId: z.string().uuid().optional(),
   orderId: z.string().uuid().optional(),
-  issueDate: z.string().optional(),
+  serviceDate: z.string().nullable().optional(),
   dueDate: z.string().optional(),
   notes: z.string().optional(),
+  skontoPercent: z.number().nonnegative().max(100).nullable().optional(),
+  skontoDays: z.number().int().nonnegative().nullable().optional(),
   items: z.array(draftItemSchema).optional(),
 });
 
@@ -128,52 +140,62 @@ const invoicesRoutes: FastifyPluginAsync = async (fastify) => {
     return invoicesService.updateStatus(request.user.tenantId, id, status);
   });
 
+  // Storno: erzeugt Stornorechnung (credit_note) mit negativen Beträgen + ST-Nummer,
+  // setzt Original auf 'cancelled'. Liefert die neue Stornorechnung.
+  fastify.post('/:id/cancel', {
+    preHandler: [fastify.requireRole('owner', 'admin')],
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const storno = await invoicesService.cancelInvoice(request.user.tenantId, id);
+    return reply.code(201).send(storno);
+  });
+
   fastify.post('/:id/send', {
     preHandler: [fastify.requireRole('owner', 'admin')],
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const tenantId = request.user.tenantId;
 
-    const invoice = await invoicesService.getById(tenantId, id);
+    const initial = await invoicesService.getById(tenantId, id);
 
-    if (!invoice.customerId) {
+    if (!initial.customerId) {
       return reply.code(422).send({ statusCode: 422, error: 'Unprocessable Entity', message: 'Draft invoice has no customer assigned' });
     }
 
-    const tenant = await db.query.tenants.findFirst({ where: eq(tenants.id, tenantId) });
-    const customer = await db.query.customers.findFirst({ where: eq(customers.id, invoice.customerId) });
-
+    const customer = await db.query.customers.findFirst({ where: eq(customers.id, initial.customerId) });
     if (!customer?.email) {
       return reply.code(422).send({ statusCode: 422, error: 'Unprocessable Entity', message: 'Customer has no email address' });
     }
 
-    const pdfBuffer = await generateInvoicePdf(invoice, tenant!);
+    // Promote draft BEFORE rendering — sonst trägt das PDF noch die DRAFT-Nummer.
+    const invoice = initial.status === 'draft'
+      ? await invoicesService.updateStatus(tenantId, id, 'sent')
+      : initial;
+
+    const tenant = await db.query.tenants.findFirst({ where: eq(tenants.id, tenantId) });
+    const pdfBuffer = await generateInvoicePdf(invoice as any, tenant!);
     const customerName = customer.type === 'business'
       ? (customer.companyName || `${customer.firstName} ${customer.lastName}`)
       : `${customer.firstName || ''} ${customer.lastName || ''}`.trim();
 
     await sendEmail({
       to: customer.email,
-      subject: `Ihre Rechnung ${invoice.invoiceNumber} von ${tenant!.name}`,
+      subject: `Ihre Rechnung ${invoice!.invoiceNumber} von ${tenant!.name}`,
       html: `
         <p>Sehr geehrte/r ${customerName},</p>
-        <p>im Anhang finden Sie Ihre Rechnung <strong>${invoice.invoiceNumber}</strong>.</p>
-        ${invoice.dueDate ? `<p>Zahlbar bis: ${new Date(invoice.dueDate).toLocaleDateString('de-AT')}</p>` : ''}
+        <p>im Anhang finden Sie Ihre Rechnung <strong>${invoice!.invoiceNumber}</strong>.</p>
+        ${invoice!.dueDate ? `<p>Zahlbar bis: ${new Date(invoice!.dueDate).toLocaleDateString('de-DE')}</p>` : ''}
         <p>Bei Fragen stehen wir Ihnen gerne zur Verfügung.</p>
         <p>Mit freundlichen Grüßen,<br>${tenant!.name}</p>
       `,
       attachments: [
         {
-          filename: `${invoice.invoiceNumber}.pdf`,
+          filename: `${invoice!.invoiceNumber}.pdf`,
           content: pdfBuffer,
           contentType: 'application/pdf',
         },
       ],
     });
-
-    if (invoice.status === 'draft') {
-      await invoicesService.updateStatus(tenantId, id, 'sent');
-    }
 
     return reply.code(204).send();
   });

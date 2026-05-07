@@ -2,17 +2,23 @@ import { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { vehiclesService } from './vehicles.service';
 
+const HSN_RE = /^[0-9]{4}$/;
+const TSN_RE = /^[A-Z0-9]{3}$/;
+
 const createVehicleSchema = z.object({
   customerId: z.string().uuid(),
   licensePlate: z.string().min(1).max(20),
-  vin: z.string().length(17).optional(),
+  vin: z.string().length(17).optional().or(z.literal('')),
+  hsn: z.string().refine(v => !v || HSN_RE.test(v), 'HSN: 4 Ziffern').optional().or(z.literal('')),
+  tsn: z.string().refine(v => !v || TSN_RE.test(v.toUpperCase()), 'TSN: 3 alphanumerisch').optional().or(z.literal('')),
   make: z.string().min(1).max(100),
   model: z.string().min(1).max(100),
-  year: z.number().int().min(1900).max(2100).optional(),
+  firstRegistration: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Format YYYY-MM-DD').optional().or(z.literal('')),
   color: z.string().optional(),
   engineDisplacement: z.number().int().optional(),
   fuelType: z.enum(['benzin', 'diesel', 'elektro', 'hybrid', 'lpg', 'cng', 'sonstige']).optional(),
-  mileage: z.number().int().optional(),
+  transmission: z.enum(['manual', 'automatic', 'semi_automatic']).optional(),
+  mileage: z.number().int().nonnegative(),
   nextTuvDate: z.string().optional(),
   notes: z.string().optional(),
 });

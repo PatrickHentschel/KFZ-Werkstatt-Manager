@@ -31,14 +31,21 @@ const itemSchema = z.object({
   taxRate: z.preprocess(nanToUndefined, z.number().nonnegative()),
   unit: z.string().optional(),
   partId: z.string().uuid().optional(),
+  serviceDate: z.string().optional(),
+  discountPercent: z.preprocess(nanToUndefined, z.number().nonnegative().max(100)).optional(),
+  discountAmount: z.preprocess(nanToUndefined, z.number().nonnegative()).optional(),
 });
 
 const invoiceSchema = z.object({
   type: z.enum(['invoice', 'quote', 'credit_note']),
-  issueDate: z.string().min(1),
-  dueDate: z.string().optional(),
+  // issueDate wird IMMER beim Versenden vom Backend gesetzt — nicht im Form.
+  serviceDate: z.string().optional(),
+  // dueDate: Pflicht (sonst Backend-400 beim Promote).
+  dueDate: z.string().min(1, 'Fälligkeitsdatum ist Pflicht'),
   notes: z.string().optional(),
   orderId: z.string().optional(),
+  skontoPercent: z.preprocess(nanToUndefined, z.number().nonnegative().max(100)).optional(),
+  skontoDays: z.preprocess(nanToUndefined, z.number().int().nonnegative()).optional(),
   items: z.array(itemSchema),
 });
 
@@ -67,7 +74,9 @@ export function InvoiceDialog({ open, onClose, invoice }: Props) {
     resolver: zodResolver(invoiceSchema),
     defaultValues: {
       type: 'invoice',
-      issueDate: new Date().toISOString().split('T')[0],
+      serviceDate: new Date().toISOString().split('T')[0],
+      // Default-Fälligkeit = heute + 14 Tage (gängige Werkstatt-Frist).
+      dueDate: (() => { const d = new Date(); d.setDate(d.getDate() + 14); return d.toISOString().split('T')[0]; })(),
       items: [],
     },
   });
@@ -93,9 +102,12 @@ export function InvoiceDialog({ open, onClose, invoice }: Props) {
       setStep(1);
       setCustomerSearch('');
       setSelectedCustomer(null);
+      const today = new Date().toISOString().split('T')[0];
+      const due = new Date(); due.setDate(due.getDate() + 14);
       reset({
         type: 'invoice',
-        issueDate: new Date().toISOString().split('T')[0],
+        serviceDate: today,
+        dueDate: due.toISOString().split('T')[0],
         items: [],
       });
       setPartPickerIdx(null);
@@ -111,10 +123,12 @@ export function InvoiceDialog({ open, onClose, invoice }: Props) {
       });
       reset({
         type: invoice.type,
-        issueDate: invoice.issueDate,
+        serviceDate: invoice.serviceDate || invoice.issueDate || '',
         dueDate: invoice.dueDate || '',
         notes: invoice.notes || '',
         orderId: invoice.orderId || '',
+        skontoPercent: invoice.skontoPercent ?? undefined,
+        skontoDays: invoice.skontoDays ?? undefined,
         items: [...invoice.items]
           .sort((a, b) => a.sortOrder - b.sortOrder)
           .map(item => ({
@@ -123,6 +137,10 @@ export function InvoiceDialog({ open, onClose, invoice }: Props) {
             quantity: Number(item.quantity),
             unitPrice: Number(item.unitPrice),
             taxRate: Number(item.taxRate),
+            unit: item.unit,
+            serviceDate: item.serviceDate || undefined,
+            discountPercent: Number(item.discountPercent ?? 0) || undefined,
+            discountAmount: Number(item.discountAmount ?? 0) || undefined,
           })),
       });
     }
@@ -165,12 +183,15 @@ export function InvoiceDialog({ open, onClose, invoice }: Props) {
   });
 
   const awMinutes = settingsData?.data?.awMinutes ?? 5;
+  const isSmallBusiness = !!settingsData?.data?.isSmallBusiness;
+  const defaultTaxRate = isSmallBusiness ? 0 : Number(settingsData?.data?.taxRate ?? 19);
 
-  const handleSelectPart = (idx: number, part: { id: string; name: string; salePrice: number; purchasePrice: number; taxRate: number }) => {
+  const handleSelectPart = (idx: number, part: { id: string; name: string; salePrice: number | string; purchasePrice: number | string; taxRate: number | string }) => {
     setValue(`items.${idx}.description`, part.name);
-    setValue(`items.${idx}.unitPrice`, part.salePrice);
-    setValue(`items.${idx}.unitCost`, part.purchasePrice);
-    setValue(`items.${idx}.taxRate`, part.taxRate);
+    setValue(`items.${idx}.unitPrice`, Number(part.salePrice));
+    setValue(`items.${idx}.unitCost`, Number(part.purchasePrice));
+    // Kleinunternehmer (§19 UStG): Items zwingend 0% — Part-Default wird ignoriert.
+    setValue(`items.${idx}.taxRate`, isSmallBusiness ? 0 : Number(part.taxRate));
     setValue(`items.${idx}.partId`, part.id);
     setPartPickerIdx(null);
     setPartPickerSearch('');
@@ -195,18 +216,24 @@ export function InvoiceDialog({ open, onClose, invoice }: Props) {
     const payload: DraftInvoicePayload = {
       customerId: selectedCustomer.id,
       type: values.type,
-      issueDate: values.issueDate || undefined,
+      serviceDate: values.serviceDate || undefined,
       dueDate: values.dueDate || undefined,
       notes: values.notes || undefined,
       orderId: values.orderId || undefined,
+      skontoPercent: values.skontoPercent ?? undefined,
+      skontoDays: values.skontoDays ?? undefined,
       items: values.items.map((item, idx) => ({
         type: item.type,
         description: item.description,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         unitCost: (item as any).unitCost,
-        taxRate: item.taxRate,
+        // §19 UStG: serverseitige Validierung lehnt nicht-0% ab; doppelt absichern.
+        taxRate: isSmallBusiness ? 0 : item.taxRate,
         unit: item.unit,
+        serviceDate: item.serviceDate || undefined,
+        discountPercent: item.discountPercent ?? undefined,
+        discountAmount: item.discountAmount ?? undefined,
         sortOrder: idx,
       })),
     };
@@ -245,15 +272,32 @@ export function InvoiceDialog({ open, onClose, invoice }: Props) {
   const onMutationError = (err: any, fallback: string) =>
     toast({ variant: 'destructive', title: 'Fehler', description: err.response?.data?.message || fallback });
 
+  const buildItemsPayload = (items: InvoiceForm['items']) =>
+    items.map((item, idx) => ({
+      type: item.type,
+      description: item.description,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      unitCost: (item as any).unitCost,
+      taxRate: isSmallBusiness ? 0 : item.taxRate,
+      unit: item.unit,
+      serviceDate: item.serviceDate || undefined,
+      discountPercent: item.discountPercent ?? undefined,
+      discountAmount: item.discountAmount ?? undefined,
+      sortOrder: idx + 1,
+    }));
+
   const updateInvoiceMutation = useMutation({
     mutationFn: (data: InvoiceForm) =>
       invoicesApi.update(invoice!.id, {
         type: data.type,
-        issueDate: data.issueDate,
-        dueDate: data.dueDate || undefined,
+        serviceDate: data.serviceDate || null,
+        dueDate: data.dueDate,
         notes: data.notes,
         orderId: data.orderId || undefined,
-        items: data.items.map((item, idx) => ({ ...item, sortOrder: idx + 1 })),
+        skontoPercent: data.skontoPercent ?? null,
+        skontoDays: data.skontoDays ?? null,
+        items: buildItemsPayload(data.items),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
@@ -269,10 +313,12 @@ export function InvoiceDialog({ open, onClose, invoice }: Props) {
         customerId: selectedCustomer!.id,
         orderId: data.orderId || undefined,
         type: data.type,
-        issueDate: data.issueDate,
-        dueDate: data.dueDate || undefined,
+        serviceDate: data.serviceDate || undefined,
+        dueDate: data.dueDate,
         notes: data.notes,
-        items: data.items.map((item, idx) => ({ ...item, sortOrder: idx + 1 })),
+        skontoPercent: data.skontoPercent ?? null,
+        skontoDays: data.skontoDays ?? null,
+        items: buildItemsPayload(data.items),
       }),
     onSuccess: () => {
       if (draftIdRef.current) {
@@ -293,8 +339,12 @@ export function InvoiceDialog({ open, onClose, invoice }: Props) {
   const items = watch('items');
   const { totalNet, totalGross } = items.reduce(
     (acc: { totalNet: number; totalGross: number }, item: InvoiceForm['items'][number]) => {
-      const net = (item.quantity || 0) * (item.unitPrice || 0);
-      return { totalNet: acc.totalNet + net, totalGross: acc.totalGross + net * (1 + (item.taxRate || 0) / 100) };
+      const gross = (item.quantity || 0) * (item.unitPrice || 0);
+      const dPct = item.discountPercent || 0;
+      const dAbs = item.discountAmount || 0;
+      const net = Math.max(0, gross - gross * (dPct / 100) - dAbs);
+      const effectiveTax = isSmallBusiness ? 0 : (item.taxRate || 0);
+      return { totalNet: acc.totalNet + net, totalGross: acc.totalGross + net * (1 + effectiveTax / 100) };
     },
     { totalNet: 0, totalGross: 0 }
   );
@@ -308,7 +358,14 @@ export function InvoiceDialog({ open, onClose, invoice }: Props) {
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b shrink-0">
             <div>
-              <Dialog.Title className="text-lg font-semibold">{invoice ? 'Rechnung bearbeiten' : 'Neue Rechnung'}</Dialog.Title>
+              <Dialog.Title className="text-lg font-semibold flex items-center gap-2">
+                <span>{invoice ? 'Rechnung bearbeiten' : 'Neue Rechnung'}</span>
+                {invoice && (
+                  <span className="font-mono text-sm text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                    {invoice.invoiceNumber}
+                  </span>
+                )}
+              </Dialog.Title>
               <div className="flex items-center gap-2 mt-1">
                 {[1, 2, 3].map((s) => (
                   <div key={s} className="flex items-center gap-1">
@@ -396,24 +453,29 @@ export function InvoiceDialog({ open, onClose, invoice }: Props) {
                   </div>
 
                   <div className="space-y-1">
-                    <Label htmlFor="issue-date">Ausstellungsdatum</Label>
+                    <Label htmlFor="service-date">Leistungsdatum (§14 UStG)</Label>
                     <Input
-                      id="issue-date"
+                      id="service-date"
                       type="date"
-                      {...register('issueDate')}
+                      {...register('serviceDate')}
                     />
-                    {errors.issueDate && (
-                      <p className="text-xs text-destructive">Pflichtfeld</p>
-                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Ausstellungsdatum wird automatisch beim Versenden gesetzt.
+                    </p>
                   </div>
 
                   <div className="space-y-1">
-                    <Label htmlFor="due-date">Faelligkeitsdatum (optional)</Label>
+                    <Label htmlFor="due-date">
+                      Fälligkeitsdatum <span className="text-destructive">*</span>
+                    </Label>
                     <Input
                       id="due-date"
                       type="date"
                       {...register('dueDate')}
                     />
+                    {errors.dueDate && (
+                      <p className="text-xs text-destructive">{errors.dueDate.message}</p>
+                    )}
                   </div>
 
                   <div className="space-y-1">
@@ -426,7 +488,7 @@ export function InvoiceDialog({ open, onClose, invoice }: Props) {
                   </div>
 
                   <div className="col-span-2 space-y-1">
-                    <Label htmlFor="order-link">Auftrag verknuepfen (optional)</Label>
+                    <Label htmlFor="order-link">Auftrag verknüpfen (optional)</Label>
                     <select
                       id="order-link"
                       {...register('orderId')}
@@ -440,7 +502,42 @@ export function InvoiceDialog({ open, onClose, invoice }: Props) {
                       ))}
                     </select>
                   </div>
+
+                  <div className="col-span-2 grid grid-cols-2 gap-2 rounded-md border p-3 bg-muted/20">
+                    <div className="col-span-2 text-sm font-medium">Skonto (optional)</div>
+                    <div className="space-y-1">
+                      <Label htmlFor="skonto-percent">Skonto-Satz (%)</Label>
+                      <Input
+                        id="skonto-percent"
+                        type="number"
+                        step="0.5"
+                        min="0"
+                        max="100"
+                        placeholder="2"
+                        {...register('skontoPercent', { valueAsNumber: true })}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="skonto-days">Innerhalb (Tage)</Label>
+                      <Input
+                        id="skonto-days"
+                        type="number"
+                        min="0"
+                        placeholder="7"
+                        {...register('skontoDays', { valueAsNumber: true })}
+                      />
+                    </div>
+                    <p className="col-span-2 text-xs text-muted-foreground">
+                      Bei Zahlung innerhalb der angegebenen Tage gewährt die Werkstatt diesen Skonto-Abzug.
+                    </p>
+                  </div>
                 </div>
+
+                {isSmallBusiness && (
+                  <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                    <strong>Kleinunternehmer (§19 UStG):</strong> Diese Rechnung wird ohne USt-Ausweis erstellt. Alle Positionen erhalten 0% MwSt.
+                  </div>
+                )}
               </div>
             )}
 
@@ -464,7 +561,7 @@ export function InvoiceDialog({ open, onClose, invoice }: Props) {
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => append({ type: t, description: '', quantity: 1, unitPrice: 0, taxRate: 20, unit: t === 'labor' ? 'AW' : undefined })}
+                          onClick={() => append({ type: t, description: '', quantity: 1, unitPrice: 0, taxRate: defaultTaxRate, unit: t === 'labor' ? 'AW' : undefined })}
                         >
                           <Plus className="mr-1 h-3 w-3" /> {TYPE_LABEL[t]}
                         </Button>
@@ -562,7 +659,7 @@ export function InvoiceDialog({ open, onClose, invoice }: Props) {
                                         <span className="font-medium">{part.name}</span>
                                         <span className="text-muted-foreground ml-2">({part.sku})</span>
                                         <span className="float-right text-muted-foreground">
-                                          {part.salePrice.toLocaleString('de-AT', { style: 'currency', currency: 'EUR' })}
+                                          {Number(part.salePrice).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
                                         </span>
                                       </button>
                                     ))}
@@ -608,6 +705,7 @@ export function InvoiceDialog({ open, onClose, invoice }: Props) {
                                 type="number"
                                 step="0.5"
                                 placeholder="MwSt %"
+                                disabled={isSmallBusiness}
                                 {...register(`items.${idx}.taxRate`, { valueAsNumber: true })}
                                 className="h-8 text-sm"
                               />
@@ -640,12 +738,40 @@ export function InvoiceDialog({ open, onClose, invoice }: Props) {
                                 {staffData.data.data.map((s) => (
                                   <option key={s.id} value={s.id}>
                                     {s.firstName} {s.lastName}
-                                    {s.awRate ? ` (${Number(s.awRate).toLocaleString('de-AT', { style: 'currency', currency: 'EUR' })}/AW)` : s.hourlyRate ? ` (${Number(s.hourlyRate).toLocaleString('de-AT', { style: 'currency', currency: 'EUR' })}/h)` : ''}
+                                    {s.awRate ? ` (${Number(s.awRate).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}/AW)` : s.hourlyRate ? ` (${Number(s.hourlyRate).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}/h)` : ''}
                                   </option>
                                 ))}
                               </select>
                             </div>
                           )}
+
+                          {/* Phase 2: Per-Item Rabatt + Leistungsdatum */}
+                          <div className="pl-1 flex items-center gap-2 flex-wrap">
+                            <span className="text-xs text-muted-foreground shrink-0">Rabatt:</span>
+                            <Input
+                              type="number"
+                              step="0.5"
+                              min="0"
+                              max="100"
+                              placeholder="%"
+                              className="h-7 w-20 text-xs"
+                              {...register(`items.${idx}.discountPercent`, { valueAsNumber: true })}
+                            />
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="€"
+                              className="h-7 w-24 text-xs"
+                              {...register(`items.${idx}.discountAmount`, { valueAsNumber: true })}
+                            />
+                            <span className="text-xs text-muted-foreground shrink-0 ml-2">Leistungsdatum:</span>
+                            <Input
+                              type="date"
+                              className="h-7 w-36 text-xs"
+                              {...register(`items.${idx}.serviceDate`)}
+                            />
+                          </div>
                         </div>
                       );
                     })}
@@ -656,13 +782,13 @@ export function InvoiceDialog({ open, onClose, invoice }: Props) {
                       <span className="text-muted-foreground">
                         Netto:{' '}
                         <span className="font-medium text-foreground">
-                          {totalNet.toLocaleString('de-AT', { style: 'currency', currency: 'EUR' })}
+                          {totalNet.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
                         </span>
                       </span>
                       <span className="text-muted-foreground">
                         Brutto:{' '}
                         <span className="font-medium text-foreground">
-                          {totalGross.toLocaleString('de-AT', { style: 'currency', currency: 'EUR' })}
+                          {totalGross.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
                         </span>
                       </span>
                     </div>

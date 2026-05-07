@@ -29,7 +29,7 @@ const invoiceStatusVariant: Record<string, string> = {
 };
 
 const formatEur = (amount: number) =>
-  new Intl.NumberFormat('de-AT', { style: 'currency', currency: 'EUR' }).format(amount);
+  new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(amount);
 
 export function DashboardPage() {
   const { data, isLoading, isError } = useQuery({
@@ -163,7 +163,7 @@ export function DashboardPage() {
                   <div>
                     <p className="font-medium text-sm">{invoice.invoiceNumber}</p>
                     <p className="text-xs text-muted-foreground">
-                      {new Date(invoice.issueDate).toLocaleDateString('de-AT')}
+                      {new Date(invoice.issueDate).toLocaleDateString('de-DE')}
                     </p>
                   </div>
                   <Badge variant={invoiceStatusVariant[invoice.status] as any}>

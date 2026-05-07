@@ -163,10 +163,11 @@ export function OrderDialog({ open, onClose }: Props) {
     { totalNet: 0, totalGross: 0 }
   );
 
-  const handleSelectPart = (idx: number, part: { id: string; name: string; salePrice: number; taxRate: number }) => {
+  const handleSelectPart = (idx: number, part: { id: string; name: string; salePrice: number | string; taxRate: number | string }) => {
+    // decimal-Spalten kommen als String aus der API → casten, sonst Zod-fail beim Save.
     setValue(`items.${idx}.description`, part.name);
-    setValue(`items.${idx}.unitPrice`, part.salePrice);
-    setValue(`items.${idx}.taxRate`, part.taxRate);
+    setValue(`items.${idx}.unitPrice`, Number(part.salePrice));
+    setValue(`items.${idx}.taxRate`, Number(part.taxRate));
     setValue(`items.${idx}.partId`, part.id);
     setPartPickerIdx(null);
     setPartPickerSearch('');
@@ -176,7 +177,7 @@ export function OrderDialog({ open, onClose }: Props) {
     const staff = staffData?.data.data.find((s) => s.id === staffId);
     if (!staff) return;
     if (staff.awRate) {
-      setValue(`items.${idx}.unitPrice`, staff.awRate);
+      setValue(`items.${idx}.unitPrice`, Number(staff.awRate));
       setValue(`items.${idx}.unit`, 'AW');
     }
   };
@@ -280,7 +281,11 @@ export function OrderDialog({ open, onClose }: Props) {
                         <span className="font-sans font-normal">— {v.make} {v.model}</span>
                       </div>
                       <div className="text-sm text-muted-foreground">
-                        {[v.year, v.fuelType, v.mileage ? `${v.mileage.toLocaleString('de-AT')} km` : null]
+                        {[
+                          v.firstRegistration ? new Date(v.firstRegistration).getFullYear() : null,
+                          v.fuelType,
+                          v.mileage ? `${v.mileage.toLocaleString('de-DE')} km` : null,
+                        ]
                           .filter(Boolean)
                           .join(' · ')}
                       </div>
@@ -461,7 +466,7 @@ export function OrderDialog({ open, onClose }: Props) {
                                         <span className="font-medium">{part.name}</span>
                                         <span className="text-muted-foreground ml-2">({part.sku})</span>
                                         <span className="float-right text-muted-foreground">
-                                          {part.salePrice.toLocaleString('de-AT', { style: 'currency', currency: 'EUR' })}
+                                          {Number(part.salePrice).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
                                         </span>
                                       </button>
                                     ))}
@@ -541,7 +546,7 @@ export function OrderDialog({ open, onClose }: Props) {
                                 {staffData.data.data.map((s) => (
                                   <option key={s.id} value={s.id}>
                                     {s.firstName} {s.lastName}
-                                    {s.awRate ? ` (${Number(s.awRate).toLocaleString('de-AT', { style: 'currency', currency: 'EUR' })}/AW)` : s.hourlyRate ? ` (${Number(s.hourlyRate).toLocaleString('de-AT', { style: 'currency', currency: 'EUR' })}/h)` : ''}
+                                    {s.awRate ? ` (${Number(s.awRate).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}/AW)` : s.hourlyRate ? ` (${Number(s.hourlyRate).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}/h)` : ''}
                                   </option>
                                 ))}
                               </select>
@@ -557,13 +562,13 @@ export function OrderDialog({ open, onClose }: Props) {
                       <span className="text-muted-foreground">
                         Netto:{' '}
                         <span className="font-medium text-foreground">
-                          {totalNet.toLocaleString('de-AT', { style: 'currency', currency: 'EUR' })}
+                          {totalNet.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
                         </span>
                       </span>
                       <span className="text-muted-foreground">
                         Brutto:{' '}
                         <span className="font-medium text-foreground">
-                          {totalGross.toLocaleString('de-AT', { style: 'currency', currency: 'EUR' })}
+                          {totalGross.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
                         </span>
                       </span>
                     </div>

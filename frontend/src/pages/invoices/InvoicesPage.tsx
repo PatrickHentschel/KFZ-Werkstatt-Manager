@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Plus, FileDown, Pencil, Search, Send, CreditCard } from 'lucide-react';
+import { Plus, FileDown, Pencil, Search, Send, CreditCard, Ban } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -9,9 +9,11 @@ import { Badge } from '@/components/ui/badge';
 import { invoicesApi, type Invoice, type InvoiceStatus } from '@/api/invoices.api';
 import { paymentsApi } from '@/api/payments.api';
 import { toast } from '@/hooks/use-toast';
+import { formatDate } from '@/lib/locale';
 import { InvoiceDialog } from './InvoiceDialog';
+import { PreviewDialog } from './PreviewDialog';
 
-const statusLabel: Record<string, string> = { draft: 'Entwurf', sent: 'Versendet', paid: 'Bezahlt', cancelled: 'Storniert' };
+const statusLabel: Record<string, string> = { draft: 'Entwurf', sent: 'Offen', paid: 'Bezahlt', cancelled: 'Storniert' };
 const statusVariant: Record<string, string> = { draft: 'secondary', sent: 'default', paid: 'success', cancelled: 'destructive' };
 
 const handleDownloadPdf = async (id: string, invoiceNumber: string) => {
@@ -24,17 +26,21 @@ const handleDownloadPdf = async (id: string, invoiceNumber: string) => {
     a.click();
     URL.revokeObjectURL(url);
   } catch {
-    toast({ variant: 'destructive', title: 'PDF nicht verfuegbar' });
+    toast({ variant: 'destructive', title: 'PDF nicht verfügbar' });
   }
 };
 
 const tabs: { label: string; value: 'all' | InvoiceStatus }[] = [
   { label: 'Alle', value: 'all' },
   { label: 'Entwurf', value: 'draft' },
-  { label: 'Versendet', value: 'sent' },
+  { label: 'Offen', value: 'sent' },
   { label: 'Bezahlt', value: 'paid' },
   { label: 'Storniert', value: 'cancelled' },
 ];
+
+type PreviewIntent =
+  | { kind: 'mark-sent'; id: string }
+  | { kind: 'send-mail'; id: string };
 
 export function InvoicesPage() {
   const queryClient = useQueryClient();
@@ -45,6 +51,7 @@ export function InvoicesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editInvoice, setEditInvoice] = useState<Invoice | null>(null);
   const [checkingOutId, setCheckingOutId] = useState<string | null>(null);
+  const [previewIntent, setPreviewIntent] = useState<PreviewIntent | null>(null);
 
   const { data: paymentConfig } = useQuery({
     queryKey: ['payment-config'],
@@ -83,7 +90,11 @@ export function InvoicesPage() {
     mutationFn: (id: string) => invoicesApi.updateStatus(id, 'sent'),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      toast({ title: 'Als versendet markiert' });
+      toast({ title: 'Rechnung versendet' });
+      setPreviewIntent(null);
+    },
+    onError: (err: any) => {
+      toast({ variant: 'destructive', title: err?.response?.data?.message || 'Versand fehlgeschlagen' });
     },
   });
 
@@ -100,12 +111,34 @@ export function InvoicesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       toast({ title: 'Rechnung per E-Mail versendet' });
+      setPreviewIntent(null);
     },
     onError: (err: any) => {
       const msg = err?.response?.data?.message || 'E-Mail konnte nicht gesendet werden';
       toast({ variant: 'destructive', title: msg });
     },
   });
+
+  const cancelInvoice = useMutation({
+    mutationFn: (id: string) => invoicesApi.cancel(id),
+    onSuccess: async (res) => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      toast({ title: 'Stornorechnung erstellt', description: res.data.invoiceNumber });
+      // Stornorechnung direkt zum Download anbieten.
+      await handleDownloadPdf(res.data.id, res.data.invoiceNumber);
+    },
+    onError: (err: any) => {
+      toast({ variant: 'destructive', title: err?.response?.data?.message || 'Storno fehlgeschlagen' });
+    },
+  });
+
+  const isPreviewBusy = markSent.isPending || sendInvoice.isPending;
+
+  const handleConfirmPreview = async () => {
+    if (!previewIntent) return;
+    if (previewIntent.kind === 'mark-sent') await markSent.mutateAsync(previewIntent.id);
+    else await sendInvoice.mutateAsync(previewIntent.id);
+  };
 
   return (
     <div className="space-y-6">
@@ -167,14 +200,16 @@ export function InvoicesPage() {
                         : '—'}
                     </td>
                     <td className="px-4 py-3 text-sm text-muted-foreground">
-                      {new Date(inv.issueDate).toLocaleDateString('de-AT')}
+                      {inv.issueDate ? formatDate(inv.issueDate) : '—'}
                     </td>
                     <td className="px-4 py-3">
                       <Badge variant={statusVariant[inv.status] as any}>{statusLabel[inv.status]}</Badge>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-2">
-                        {inv.status === 'draft' && (
+                        {/* Stornorechnungen (credit_note) sind reine Buchungsbelege —
+                            keine Bezahl-, Versand- oder Status-Aktionen, nur PDF-Download. */}
+                        {inv.type === 'invoice' && inv.status === 'draft' && (
                           <Button
                             variant="outline"
                             size="icon"
@@ -184,27 +219,27 @@ export function InvoicesPage() {
                             <Pencil className="h-4 w-4" />
                           </Button>
                         )}
-                        {inv.status === 'draft' && (
+                        {inv.type === 'invoice' && inv.status === 'draft' && (
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => markSent.mutate(inv.id)}
+                            onClick={() => setPreviewIntent({ kind: 'mark-sent', id: inv.id })}
                           >
                             Versenden
                           </Button>
                         )}
-                        {(inv.status === 'draft' || inv.status === 'sent') && (
+                        {inv.type === 'invoice' && (inv.status === 'draft' || inv.status === 'sent') && (
                           <Button
                             variant="outline"
                             size="icon"
                             title="Per E-Mail senden"
-                            onClick={() => sendInvoice.mutate(inv.id)}
+                            onClick={() => setPreviewIntent({ kind: 'send-mail', id: inv.id })}
                             disabled={sendInvoice.isPending}
                           >
                             <Send className="h-4 w-4" />
                           </Button>
                         )}
-                        {inv.status === 'sent' && (
+                        {inv.type === 'invoice' && inv.status === 'sent' && (
                           <Button
                             variant="default"
                             size="sm"
@@ -215,13 +250,28 @@ export function InvoicesPage() {
                             {paymentConfig?.mode === 'stripe' ? 'Online bezahlen' : 'Bezahlen'}
                           </Button>
                         )}
-                        {inv.status === 'sent' && (
+                        {inv.type === 'invoice' && inv.status === 'sent' && (
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => markPaid.mutate(inv.id)}
                           >
                             Als bezahlt markieren
+                          </Button>
+                        )}
+                        {inv.type === 'invoice' && (inv.status === 'sent' || inv.status === 'paid') && (
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            title="Stornieren"
+                            onClick={() => {
+                              if (confirm(`Rechnung ${inv.invoiceNumber} wirklich stornieren? Es wird eine Stornorechnung mit negativen Beträgen erstellt.`)) {
+                                cancelInvoice.mutate(inv.id);
+                              }
+                            }}
+                            disabled={cancelInvoice.isPending}
+                          >
+                            <Ban className="h-4 w-4 text-destructive" />
                           </Button>
                         )}
                         <Button
@@ -246,6 +296,16 @@ export function InvoicesPage() {
         open={dialogOpen || !!editInvoice}
         onClose={() => { setDialogOpen(false); setEditInvoice(null); }}
         invoice={editInvoice ?? undefined}
+      />
+
+      <PreviewDialog
+        open={!!previewIntent}
+        invoiceId={previewIntent?.id ?? null}
+        confirmLabel={previewIntent?.kind === 'send-mail' ? 'Per E-Mail senden' : 'Versenden bestätigen'}
+        notice="Die Rechnung erhält beim Bestätigen die nächste fortlaufende Nummer und das aktuelle Ausstellungsdatum."
+        pending={isPreviewBusy}
+        onConfirm={handleConfirmPreview}
+        onClose={() => setPreviewIntent(null)}
       />
     </div>
   );

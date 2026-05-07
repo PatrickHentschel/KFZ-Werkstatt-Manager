@@ -1,4 +1,5 @@
 <!-- GSD:project-start source:PROJECT.md -->
+
 ## Project
 
 **WerkstattClone**
@@ -14,21 +15,29 @@ Multi-tenant workshop management app for automotive repair shops. Manages custom
 <!-- GSD:project-end -->
 
 <!-- GSD:stack-start source:codebase/STACK.md -->
+
 ## Technology Stack
 
 ## Languages
+
 - TypeScript 5.5.4 — all frontend and backend source code
 - SQL — PostgreSQL migrations in `backend/src/db/migrations/`
 - JavaScript — config files (`tailwind.config.js`, `postcss.config.js`)
+
 ## Runtime
+
 - Node.js (system: v24; no `.nvmrc` pinning detected)
 - npm workspaces (monorepo root: `package.json`)
 - Lockfile: `package-lock.json` present at root and `backend/`
+
 ## Monorepo Structure
+
 - `packages/shared` → `@werkstatt/shared` — shared TypeScript types (e.g., `JwtPayload`)
 - `backend` → `@werkstatt/backend`
 - `frontend` → `@werkstatt/frontend`
+
 ## Frameworks
+
 - Fastify 4.28.1 — HTTP server (`backend/src/server.ts`, `backend/src/app.ts`)
 - React 18.3.1 — UI framework (`frontend/src/main.tsx`)
 - React Router DOM 6.25.1 — client-side routing
@@ -39,7 +48,9 @@ Multi-tenant workshop management app for automotive repair shops. Manages custom
 - `ts-node-dev` ^2.0.0 — backend dev server with hot reload
 - `tsx` ^4.17.0 — backend scripts (migrations, seeds)
 - Not detected — no test framework or test files found.
+
 ## Key Dependencies
+
 - `drizzle-orm` ^0.33.0 — type-safe ORM for PostgreSQL
 - `drizzle-kit` ^0.24.0 — schema migrations and Drizzle Studio
 - `pg` ^8.12.0 — PostgreSQL client (connection pool, max 20 connections)
@@ -65,13 +76,17 @@ Multi-tenant workshop management app for automotive repair shops. Manages custom
 - `clsx` ^2.1.1 + `tailwind-merge` ^2.4.0 — conditional className merging
 - `lucide-react` ^0.414.0 — icon library
 - `date-fns` ^3.6.0 — date formatting
+
 ## Database
+
 - PostgreSQL 16 (Alpine) — Docker image `postgres:16-alpine`
 - ORM: Drizzle ORM with `node-postgres` driver
 - Schema location: `backend/src/db/schema/` (tables: `tenants`, `users`, `customers`, `vehicles`, `orders`, `invoices`, `parts`, `staff`, `appointments`, `google_tokens`)
 - Migrations: `backend/src/db/migrations/` (run with `tsx src/db/migrate.ts`)
 - Drizzle config: `backend/drizzle.config.ts`
+
 ## Configuration
+
 - Variables injected via `docker-compose.yml`; read in `backend/src/config.ts`
 - Sensitive values (JWT secrets, SMTP password, Stripe keys) read from env vars OR Docker secrets files at `/run/secrets/<name>`
 - `DATABASE_URL` — PostgreSQL connection string
@@ -88,7 +103,9 @@ Multi-tenant workshop management app for automotive repair shops. Manages custom
 - Frontend: `tsc && vite build` → `frontend/dist/`
 - Backend: `tsc` → `backend/dist/`
 - Shared: `tsc` → `packages/shared/dist/`
+
 ## Platform Requirements
+
 - Docker + Docker Compose (all services run via `docker-compose up`)
 - Ports: frontend 5273, backend 3009, PostgreSQL 5537
 - Docker Compose (`docker-compose.prod.yml`)
@@ -98,47 +115,64 @@ Multi-tenant workshop management app for automotive repair shops. Manages custom
 <!-- GSD:stack-end -->
 
 <!-- GSD:conventions-start source:CONVENTIONS.md -->
+
 ## Conventions
 
 ## File Naming
+
 - Components: `PascalCase.tsx` (e.g., `InvoiceDialog.tsx`)
 - API modules: `kebab-case.api.ts` (e.g., `invoices.api.ts`)
 - Backend modules: `module.routes.ts` / `module.service.ts` / `module.schema.ts`
 - Shared types: `module.types.ts`
+
 ## Frontend Component Pattern
+
 - Named exports (not default)
 - Page components use `useQuery` + `useMutation` from TanStack Query
 - Dialog/form components use `useForm` + `zodResolver`
 - No local state for server data — all via TanStack Query
+
 ## Frontend API Pattern
+
 ## Backend Module Pattern
+
 - Fastify plugin per module (routes file exports plugin)
 - Class-based service singletons with tenant-scoped methods
 - `errors.notFound()` factory for 404s
 - Route params typed via Fastify generics (frequent `as any` workaround)
+
 ## Error Handling
+
 - Backend: `AppError` class with HTTP status
 - Frontend: `onError` callback → toast notification; 401 interceptor triggers token refresh
+
 ## TypeScript
+
 - Strict mode on both frontend and backend
 - `@/*` path alias on frontend only
 - Shared types imported from `packages/shared`
+
 ## Imports
+
 - Frontend: `@/components/...`, `@/lib/...`, `@/hooks/...`
 - Backend: relative imports
 - Shared package imported as `@werkstatt/shared`
 <!-- GSD:conventions-end -->
 
 <!-- GSD:architecture-start source:ARCHITECTURE.md -->
+
 ## Architecture
 
 ## Pattern Overview
+
 - All data is scoped to a `tenantId` (one tenant = one workshop). Every DB table carries a `tenant_id` column.
 - RLS is enforced at the Postgres level via a GUC (`app.current_tenant_id`), set per request by the auth plugin. This means even a buggy query cannot leak cross-tenant data.
 - Access tokens live in memory only; refresh tokens are stored as hashed values in `refresh_tokens` table and rotated on every `/refresh` call.
 - Appointments are backed exclusively by Google Calendar — there is no local `appointments` table for events. The `appointments` table in the schema only stores reminder metadata.
 - Payments support two modes: demo (no Stripe) and real Stripe checkout, selected at startup by the presence of `STRIPE_SECRET_KEY`.
+
 ## Layers
+
 - Purpose: User-facing workshop management UI
 - Location: `frontend/src/`
 - Contains: Pages, components, API client, Zustand stores, React Query hooks
@@ -153,11 +187,15 @@ Multi-tenant workshop management app for automotive repair shops. Manages custom
 - Location: `packages/shared/src/types/`
 - Contains: `JwtPayload`, `UserRole`, `PaginatedResponse`, `ApiError`, and domain interface types
 - Consumed by: Both `@werkstatt/backend` and `@werkstatt/frontend` via npm workspaces
+
 ## Data Flow
+
 - `useAuthStore` (Zustand + persist): holds `user` and `isAuthenticated` in `localStorage`; access token intentionally NOT persisted (memory only)
 - `useUIStore` (Zustand, no persist): sidebar open/close state
 - Server state: All domain data (orders, invoices, customers, etc.) managed by TanStack React Query — no manual caching
+
 ## Key Abstractions
+
 - Purpose: Self-contained vertical slice for each domain entity
 - Pattern: Each module = `{name}.routes.ts` + `{name}.service.ts` (appointments is the exception: it has a `google-calendar.service.ts` instead of a plain service)
 - Examples: `backend/src/modules/orders/`, `backend/src/modules/invoices/`
@@ -173,7 +211,9 @@ Multi-tenant workshop management app for automotive repair shops. Manages custom
 - Purpose: Abstraction layer over Stripe or demo mode
 - Interface: `backend/src/modules/payments/payments.provider.ts` — `PaymentProvider` interface
 - Implementations: `payments.stripe.ts` and `payments.demo.ts`; selected at runtime by `createPaymentProvider()`
+
 ## Entry Points
+
 - Location: `backend/src/server.ts`
 - Triggers: `npm run dev` (ts-node-dev) or `node dist/server.js` (production)
 - Responsibilities: Loads env, calls `buildApp()`, listens on `PORT`, starts appointment reminder cron
@@ -185,40 +225,18 @@ Multi-tenant workshop management app for automotive repair shops. Manages custom
 - Responsibilities: Mounts React app
 - Location: `frontend/src/App.tsx`
 - Responsibilities: Wraps app in `QueryClientProvider`, defines all routes, wraps protected routes in `ProtectedRoute`
+
 ## Error Handling
+
 - `AppError` class (`backend/src/utils/errors.ts`) carries `statusCode` and `error` label
 - `errors.*` factory (`errors.notFound()`, `errors.unauthorized()`, etc.) used throughout service classes
 - Zod parse errors are caught and returned as 400 with the parsed Zod message
 - Unhandled errors return 500 with the stack in development, generic message in production
 - 401 responses trigger automatic token refresh via interceptor; on failure, logout + redirect to `/login`
 - React Query `onError` callbacks used per-query for toast notifications
+
 ## Cross-Cutting Concerns
+
 <!-- GSD:architecture-end -->
 
 <!-- GSD:skills-start source:skills/ -->
-## Project Skills
-
-No project skills found. Add skills to any of: `.claude/skills/`, `.agents/skills/`, `.cursor/skills/`, or `.github/skills/` with a `SKILL.md` index file.
-<!-- GSD:skills-end -->
-
-<!-- GSD:workflow-start source:GSD defaults -->
-## GSD Workflow Enforcement
-
-Before using Edit, Write, or other file-changing tools, start work through a GSD command so planning artifacts and execution context stay in sync.
-
-Use these entry points:
-- `/gsd-quick` for small fixes, doc updates, and ad-hoc tasks
-- `/gsd-debug` for investigation and bug fixing
-- `/gsd-execute-phase` for planned phase work
-
-Do not make direct repo edits outside a GSD workflow unless the user explicitly asks to bypass it.
-<!-- GSD:workflow-end -->
-
-
-
-<!-- GSD:profile-start -->
-## Developer Profile
-
-> Profile not yet configured. Run `/gsd-profile-user` to generate your developer profile.
-> This section is managed by `generate-claude-profile` -- do not edit manually.
-<!-- GSD:profile-end -->

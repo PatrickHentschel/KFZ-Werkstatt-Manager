@@ -6,7 +6,13 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { vehiclesApi, type Vehicle } from '@/api/vehicles.api';
 import { toast } from '@/hooks/use-toast';
+import { formatNumber } from '@/lib/locale';
 import { VehicleDialog } from './VehicleDialog';
+
+function customerName(c: Vehicle['customer']): string {
+  if (!c) return '—';
+  return c.companyName || `${c.firstName || ''} ${c.lastName || ''}`.trim() || '—';
+}
 
 export function VehiclesPage() {
   const queryClient = useQueryClient();
@@ -70,30 +76,26 @@ export function VehiclesPage() {
             <table className="w-full">
               <thead className="border-b bg-muted/50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-sm font-medium">Kennzeichen</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">Marke / Modell</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">Baujahr</th>
                   <th className="px-4 py-3 text-left text-sm font-medium">Kunde</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">Nächste HU</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium">Kennzeichen</th>
+                  <th className="px-4 py-3 text-right text-sm font-medium">KM-Stand</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium">FIN</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium">Modell</th>
                   <th className="px-4 py-3 text-right text-sm font-medium">Aktionen</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {data?.data.data.map((v: Vehicle) => (
                   <tr key={v.id} className="hover:bg-muted/30">
+                    <td className="px-4 py-3 text-sm">{customerName(v.customer)}</td>
                     <td className="px-4 py-3 font-mono font-medium">{v.licensePlate}</td>
+                    <td className="px-4 py-3 text-sm text-right tabular-nums">
+                      {formatNumber(v.mileage)} km
+                    </td>
+                    <td className="px-4 py-3 text-xs font-mono text-muted-foreground">
+                      {v.vin || '—'}
+                    </td>
                     <td className="px-4 py-3">{v.make} {v.model}</td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground">{v.year || '—'}</td>
-                    <td className="px-4 py-3 text-sm">
-                      {v.customer
-                        ? v.customer.companyName
-                          || `${v.customer.firstName || ''} ${v.customer.lastName || ''}`.trim()
-                          || '—'
-                        : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground">
-                      {v.nextTuvDate || '—'}
-                    </td>
                     <td className="px-4 py-3 text-right">
                       <Button
                         variant="ghost"

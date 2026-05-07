@@ -182,7 +182,7 @@ export function OrdersPage() {
                         </Badge>
                       </td>
                       <td className="px-4 py-3 text-sm text-muted-foreground">
-                        {new Date(o.createdAt).toLocaleDateString('de-AT')}
+                        {new Date(o.createdAt).toLocaleDateString('de-DE')}
                       </td>
                       <td
                         className="px-4 py-3 text-right space-x-2"

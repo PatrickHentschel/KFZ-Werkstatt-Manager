@@ -25,10 +25,10 @@ async function runReminderCheck() {
     if (!appt.customer?.email) continue;
 
     const customerName = [appt.customer.firstName, appt.customer.lastName].filter(Boolean).join(' ');
-    const startFormatted = appt.startTime.toLocaleString('de-AT', {
+    const startFormatted = appt.startTime.toLocaleString('de-DE', {
       dateStyle: 'full',
       timeStyle: 'short',
-      timeZone: 'Europe/Vienna',
+      timeZone: 'Europe/Berlin',
     });
 
     try {

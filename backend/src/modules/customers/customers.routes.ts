@@ -1,19 +1,30 @@
 import { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { customersService } from './customers.service';
+import { taxIdSchema, postalCodeDeSchema, phoneDeSchema } from '../../utils/validators';
+
+// Hausnummer: Ziffern + optional Buchstabe(n) + optional Bereich (12, 12a, 12-14, 12 a)
+const HOUSE_NUMBER_RE = /^[0-9]{1,5}[a-zA-Z]?(\s?[-/]\s?[0-9]{1,5}[a-zA-Z]?)?$/;
+const houseNumberSchema = z.string().trim().refine(
+  v => v === '' || HOUSE_NUMBER_RE.test(v),
+  { message: 'Ungültige Hausnummer' },
+);
 
 const createCustomerSchema = z.object({
   type: z.enum(['private', 'business']).default('private'),
+  salutation: z.enum(['herr', 'frau', 'divers']).nullable().optional(),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
   companyName: z.string().optional(),
-  email: z.string().email().optional(),
-  phone: z.string().optional(),
-  mobile: z.string().optional(),
-  address: z.string().optional(),
+  birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Format YYYY-MM-DD').nullable().optional().or(z.literal('')),
+  email: z.string().email().optional().or(z.literal('')),
+  phone: phoneDeSchema.optional(),
+  mobile: phoneDeSchema.optional(),
+  street: z.string().optional(),
+  houseNumber: houseNumberSchema.optional(),
   city: z.string().optional(),
-  postalCode: z.string().optional(),
-  taxId: z.string().optional(),
+  postalCode: postalCodeDeSchema.optional(),
+  taxId: taxIdSchema.optional(),
   notes: z.string().optional(),
 });
 

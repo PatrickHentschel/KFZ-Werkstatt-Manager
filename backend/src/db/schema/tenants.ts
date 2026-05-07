@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, text, integer, decimal, pgEnum, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, text, integer, decimal, pgEnum, timestamp, boolean } from 'drizzle-orm/pg-core';
 
 export const tenantPlanEnum = pgEnum('tenant_plan', ['trial', 'starter', 'professional', 'enterprise']);
 
@@ -8,12 +8,21 @@ export const tenants = pgTable('tenants', {
   email: varchar('email', { length: 255 }).notNull(),
   phone: varchar('phone', { length: 50 }),
   address: text('address'),
+  postalCode: varchar('postal_code', { length: 10 }),
   city: varchar('city', { length: 100 }),
   country: varchar('country', { length: 2 }).notNull().default('DE'),
   taxId: varchar('tax_id', { length: 50 }),
-  taxRate: decimal('tax_rate', { precision: 5, scale: 2 }).notNull().default('20.00'),
+  taxRate: decimal('tax_rate', { precision: 5, scale: 2, mode: 'number' }).notNull().default(19.00),
+  isSmallBusiness: boolean('is_small_business').notNull().default(false),
+  iban: varchar('iban', { length: 34 }),
+  bic: varchar('bic', { length: 11 }),
+  bankName: varchar('bank_name', { length: 255 }),
   invoicePrefix: varchar('invoice_prefix', { length: 20 }).notNull().default('RE'),
-  invoiceCounter: integer('invoice_counter').notNull().default(1),
+  // Counter zählt die LETZTE vergebene Nummer. Bump (counter + 1) gibt die nächste zurück.
+  // Default 0 → erste Nummer wird 00001.
+  invoiceCounter: integer('invoice_counter').notNull().default(0),
+  cancelInvoicePrefix: varchar('cancel_invoice_prefix', { length: 20 }).notNull().default('ST'),
+  cancelInvoiceCounter: integer('cancel_invoice_counter').notNull().default(0),
   awMinutes: integer('aw_minutes').notNull().default(5),
   plan: tenantPlanEnum('plan').notNull().default('trial'),
   logoUrl: text('logo_url'),

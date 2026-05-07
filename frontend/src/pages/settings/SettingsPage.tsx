@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Save, Building2, FileText, Wrench } from 'lucide-react';
+import { Save, Building2, FileText, Wrench, Landmark } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,14 +11,30 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { settingsApi } from '@/api/settings.api';
 import { toast } from '@/hooks/use-toast';
 
+const PLZ_RE = /^[0-9]{5}$/;
+const PHONE_RE = /^(\+49|0)[0-9 \-/()]{6,20}$/;
+const USTIDNR_RE = /^DE[0-9]{9}$/;
+const STEUERNR_RE = /^[0-9]{2,3}[ /]?[0-9]{3}[ /]?[0-9]{4,5}$/;
+const BIC_RE = /^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/;
+// Lightweight IBAN sanity check (length + alphanumeric); full mod-97 happens server-side.
+const IBAN_RE = /^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$/;
+
 const schema = z.object({
   name: z.string().min(2, 'Mindestens 2 Zeichen'),
   email: z.string().email('Ungültige E-Mail'),
-  phone: z.string().optional(),
+  phone: z.string().refine(v => !v || PHONE_RE.test(v), 'Format: +49... oder 0...').optional(),
   address: z.string().optional(),
+  postalCode: z.string().refine(v => !v || PLZ_RE.test(v), 'PLZ muss 5 Ziffern enthalten').optional(),
   city: z.string().optional(),
-  taxId: z.string().optional(),
-  taxRate: z.number().min(0).max(100),
+  taxId: z.string().refine(
+    v => !v || USTIDNR_RE.test(v.toUpperCase().replace(/\s/g, '')) || STEUERNR_RE.test(v),
+    'USt-IdNr. (DE + 9 Ziffern) oder Steuernummer (10-13 Ziffern)',
+  ).optional(),
+  taxRate: z.number().refine(v => v === 19 || v === 0, 'Nur 19 oder 0'),
+  isSmallBusiness: z.boolean(),
+  iban: z.string().refine(v => !v || IBAN_RE.test(v.replace(/\s/g, '').toUpperCase()), 'Ungültige IBAN').optional(),
+  bic: z.string().refine(v => !v || BIC_RE.test(v.toUpperCase()), 'Ungültige BIC').optional(),
+  bankName: z.string().max(255).optional(),
   invoicePrefix: z.string().max(20),
   awMinutes: z.number().int().min(1).max(60),
 });
@@ -33,10 +49,12 @@ export function SettingsPage() {
     queryFn: () => settingsApi.get(),
   });
 
-  const { register, handleSubmit, reset, formState: { errors, isDirty } } = useForm<FormData>({
+  const { register, handleSubmit, reset, watch, formState: { errors, isDirty } } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { taxRate: 20, invoicePrefix: 'RE', awMinutes: 5 },
+    defaultValues: { taxRate: 19, isSmallBusiness: false, invoicePrefix: 'RE', awMinutes: 5 },
   });
+
+  const isSmallBusiness = watch('isSmallBusiness');
 
   useEffect(() => {
     if (data?.data) {
@@ -46,9 +64,14 @@ export function SettingsPage() {
         email: s.email,
         phone: s.phone || '',
         address: s.address || '',
+        postalCode: s.postalCode || '',
         city: s.city || '',
         taxId: s.taxId || '',
         taxRate: Number(s.taxRate),
+        isSmallBusiness: !!s.isSmallBusiness,
+        iban: s.iban || '',
+        bic: s.bic || '',
+        bankName: s.bankName || '',
         invoicePrefix: s.invoicePrefix,
         awMinutes: s.awMinutes ?? 5,
       });
@@ -61,7 +84,11 @@ export function SettingsPage() {
       queryClient.invalidateQueries({ queryKey: ['settings'] });
       toast({ title: 'Einstellungen gespeichert' });
     },
-    onError: () => toast({ variant: 'destructive', title: 'Fehler beim Speichern' }),
+    onError: (e: any) => toast({
+      variant: 'destructive',
+      title: 'Fehler beim Speichern',
+      description: e?.response?.data?.message,
+    }),
   });
 
   if (isLoading) return <div className="text-muted-foreground">Wird geladen...</div>;
@@ -104,21 +131,29 @@ export function SettingsPage() {
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-2">
                 <Label>E-Mail *</Label>
-                <Input type="email" {...register('email')} placeholder="info@werkstatt.at" />
+                <Input type="email" {...register('email')} placeholder="info@werkstatt.de" />
                 {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
               </div>
               <div className="space-y-2">
                 <Label>Telefon</Label>
-                <Input {...register('phone')} placeholder="+43 1 234 5678" />
+                <Input {...register('phone')} placeholder="+49 30 1234567" />
+                {errors.phone && <p className="text-xs text-destructive">{errors.phone.message}</p>}
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Adresse</Label>
+              <Label>Straße + Hausnummer</Label>
               <Input {...register('address')} placeholder="Musterstraße 1" />
             </div>
-            <div className="space-y-2">
-              <Label>Stadt</Label>
-              <Input {...register('city')} placeholder="Wien" />
+            <div className="grid grid-cols-[120px_1fr] gap-2">
+              <div className="space-y-2">
+                <Label>PLZ</Label>
+                <Input {...register('postalCode')} placeholder="10115" maxLength={5} />
+                {errors.postalCode && <p className="text-xs text-destructive">{errors.postalCode.message}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label>Stadt</Label>
+                <Input {...register('city')} placeholder="Berlin" />
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -129,21 +164,44 @@ export function SettingsPage() {
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" /> Rechnungseinstellungen
             </CardTitle>
-            <CardDescription>UID-Nummer, MwSt-Satz und Rechnungspräfix</CardDescription>
+            <CardDescription>Steuernummer / USt-IdNr., MwSt-Satz und Rechnungspräfix</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>UID-Nummer / Steuernummer</Label>
-              <Input {...register('taxId')} placeholder="ATU12345678 oder DE123456789" />
+              <Label>Steuernummer / USt-IdNr.</Label>
+              <Input {...register('taxId')} placeholder="DE123456789 oder 12/345/67890" />
+              {errors.taxId && <p className="text-xs text-destructive">{errors.taxId.message}</p>}
             </div>
+
+            <div className="flex items-start gap-3 rounded-md border p-3">
+              <input
+                type="checkbox"
+                id="isSmallBusiness"
+                {...register('isSmallBusiness')}
+                className="mt-1"
+              />
+              <div className="space-y-1">
+                <Label htmlFor="isSmallBusiness" className="cursor-pointer font-medium">
+                  Kleinunternehmer (§19 UStG)
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Aktiv: Rechnungen ohne Umsatzsteuer-Ausweis, MwSt-Satz wird auf 0 gesetzt.
+                </p>
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-2">
                 <Label>MwSt-Satz (%)</Label>
                 <Input
                   type="number"
-                  step="0.5"
+                  step="1"
+                  disabled={isSmallBusiness}
                   {...register('taxRate', { valueAsNumber: true })}
                 />
+                <p className="text-xs text-muted-foreground">
+                  19 (Standard) oder 0 (Kleinunternehmer)
+                </p>
                 {errors.taxRate && (
                   <p className="text-xs text-destructive">{errors.taxRate.message}</p>
                 )}
@@ -152,6 +210,34 @@ export function SettingsPage() {
                 <Label>Rechnungspräfix</Label>
                 <Input {...register('invoicePrefix')} placeholder="RE" maxLength={20} />
                 <p className="text-xs text-muted-foreground">Beispiel: RE-00001</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Banking */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Landmark className="h-5 w-5" /> Bankverbindung
+            </CardTitle>
+            <CardDescription>Wird auf Rechnungen ausgewiesen</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>IBAN</Label>
+              <Input {...register('iban')} placeholder="DE89 3704 0044 0532 0130 00" />
+              {errors.iban && <p className="text-xs text-destructive">{errors.iban.message}</p>}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-2">
+                <Label>BIC</Label>
+                <Input {...register('bic')} placeholder="COBADEFFXXX" />
+                {errors.bic && <p className="text-xs text-destructive">{errors.bic.message}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label>Bank</Label>
+                <Input {...register('bankName')} placeholder="Commerzbank" />
               </div>
             </div>
           </CardContent>

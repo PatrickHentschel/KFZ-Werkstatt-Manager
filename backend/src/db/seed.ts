@@ -16,15 +16,16 @@ async function seed() {
   // Create demo tenant
   const [tenant] = await db.insert(schema.tenants).values({
     name: 'Demo Werkstatt GmbH',
-    email: 'info@demo-werkstatt.at',
-    phone: '+43 1 234 5678',
-    address: 'Werkstattgasse 1',
-    city: 'Wien',
-    country: 'AT',
-    taxId: 'ATU12345678',
-    taxRate: '20.00',
+    email: 'info@demo-werkstatt.de',
+    phone: '+49 30 1234567',
+    address: 'Werkstattstraße 1',
+    postalCode: '10115',
+    city: 'Berlin',
+    country: 'DE',
+    taxId: 'DE123456789',
+    taxRate: 19,
     invoicePrefix: 'RE',
-    invoiceCounter: 1,
+    invoiceCounter: 0,
     plan: 'trial',
   }).returning();
 
@@ -34,7 +35,7 @@ async function seed() {
   const passwordHash = await bcrypt.hash('demo1234', 12);
   const [user] = await db.insert(schema.users).values({
     tenantId: tenant.id,
-    email: 'owner@demo-werkstatt.at',
+    email: 'owner@demo-werkstatt.de',
     passwordHash,
     name: 'Hans Meister',
     role: 'owner',
@@ -42,7 +43,7 @@ async function seed() {
 
   console.log(`Created user: ${user.email}`);
   console.log('\nSeed complete!');
-  console.log('Login with: owner@demo-werkstatt.at / demo1234');
+  console.log('Login with: owner@demo-werkstatt.de / demo1234');
 
   await pool.end();
 }

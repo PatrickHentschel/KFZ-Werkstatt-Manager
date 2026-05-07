@@ -7,6 +7,41 @@ import { getPaginationParams, buildPaginatedResponse } from '../../utils/paginat
 
 type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'cancelled';
 
+type ItemInput = {
+  type?: 'labor' | 'part' | 'misc';
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  unitCost?: number;
+  taxRate: number;
+  unit?: string;
+  serviceDate?: string | null;
+  discountAmount?: number;
+  discountPercent?: number;
+  sortOrder?: number;
+};
+
+type DraftItemInput = Partial<ItemInput> & { description?: string };
+
+const today = () => new Date().toISOString().split('T')[0];
+
+/**
+ * §19 UStG: Kleinunternehmer dürfen keine Umsatzsteuer ausweisen.
+ * Items mit taxRate ≠ 0 werden vom Service abgelehnt.
+ */
+async function assertSmallBusinessRule(tenantId: string, items: Array<{ taxRate?: number }> | undefined) {
+  if (!items || items.length === 0) return;
+  const tenant = await db.query.tenants.findFirst({
+    where: eq(tenants.id, tenantId),
+    columns: { isSmallBusiness: true },
+  });
+  if (!tenant?.isSmallBusiness) return;
+  const violation = items.some(i => i.taxRate != null && Number(i.taxRate) !== 0);
+  if (violation) {
+    throw errors.badRequest('Kleinunternehmer (§19 UStG): Positionen müssen 0% MwSt haben.');
+  }
+}
+
 export class InvoicesService {
   async list(tenantId: string, query: any) {
     const { page, pageSize, offset, limit } = getPaginationParams(query);
@@ -36,7 +71,7 @@ export class InvoicesService {
     const [data, countResult] = await Promise.all([
       db.query.invoices.findMany({
         where: () => whereClause,
-        with: { customer: true, items: true },
+        with: { customer: true, items: true, cancelsInvoice: { columns: { invoiceNumber: true, issueDate: true } } },
         orderBy: (i, { desc }) => [desc(i.createdAt)],
         limit,
         offset,
@@ -50,7 +85,7 @@ export class InvoicesService {
   async getById(tenantId: string, id: string) {
     const invoice = await db.query.invoices.findFirst({
       where: and(eq(invoices.id, id), eq(invoices.tenantId, tenantId)),
-      with: { customer: true, items: true },
+      with: { customer: true, items: true, cancelsInvoice: { columns: { invoiceNumber: true, issueDate: true } } },
     });
     if (!invoice) throw errors.notFound('Invoice');
     return invoice;
@@ -60,47 +95,65 @@ export class InvoicesService {
     type: 'invoice' | 'quote' | 'credit_note';
     customerId: string;
     orderId?: string;
-    issueDate: string;
-    dueDate?: string;
+    serviceDate?: string;
+    dueDate: string;          // Pflicht
     notes?: string;
-    items: Array<{ type?: 'labor' | 'part' | 'misc'; description: string; quantity: number; unitPrice: number; unitCost?: number; taxRate: number; unit?: string; sortOrder?: number }>;
+    skontoPercent?: number;
+    skontoDays?: number;
+    items: ItemInput[];
   }) {
-    // Generate invoice number
-    const [tenant] = await db.update(tenants)
-      .set({ invoiceCounter: sql`${tenants.invoiceCounter} + 1` })
-      .where(eq(tenants.id, tenantId))
-      .returning();
+    await assertSmallBusinessRule(tenantId, data.items);
+    if (!data.dueDate) throw errors.badRequest('Fälligkeitsdatum ist Pflicht');
 
-    const invoiceNumber = `${tenant.invoicePrefix}-${String(tenant.invoiceCounter).padStart(5, '0')}`;
+    // issueDate IMMER server-seitig: aktuelles Datum.
+    // Counter-Bump + INSERT in TX → bei Rollback keine Lücke (§14 UStG).
+    return db.transaction(async (tx) => {
+      const [tenant] = await tx
+        .update(tenants)
+        .set({ invoiceCounter: sql`${tenants.invoiceCounter} + 1` })
+        .where(eq(tenants.id, tenantId))
+        .returning();
+      const invoiceNumber = `${tenant.invoicePrefix}-${String(tenant.invoiceCounter).padStart(5, '0')}`;
+      const issueDate = today();
 
-    const [invoice] = await db.insert(invoices).values({
-      tenantId,
-      invoiceNumber,
-      type: data.type,
-      customerId: data.customerId,
-      orderId: data.orderId,
-      issueDate: data.issueDate,
-      dueDate: data.dueDate,
-      notes: data.notes,
-    }).returning();
+      const [invoice] = await tx.insert(invoices).values({
+        tenantId,
+        invoiceNumber,
+        type: data.type,
+        customerId: data.customerId,
+        orderId: data.orderId,
+        issueDate,
+        serviceDate: data.serviceDate ?? issueDate,
+        dueDate: data.dueDate,
+        skontoPercent: data.skontoPercent ?? null,
+        skontoDays: data.skontoDays ?? null,
+        notes: data.notes,
+      }).returning();
 
-    if (data.items.length > 0) {
-      await db.insert(invoiceItems).values(
-        data.items.map((item, idx) => ({
-          invoiceId: invoice.id,
-          type: item.type ?? 'misc',
-          description: item.description,
-          quantity: String(item.quantity),
-          unitPrice: String(item.unitPrice),
-          unitCost: String(item.unitCost ?? 0),
-          taxRate: String(item.taxRate),
-          unit: item.unit || null,
-          sortOrder: item.sortOrder ?? idx,
-        }))
-      );
-    }
+      if (data.items.length > 0) {
+        await tx.insert(invoiceItems).values(
+          data.items.map((item, idx) => ({
+            invoiceId: invoice.id,
+            type: item.type ?? 'misc',
+            description: item.description,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            unitCost: item.unitCost ?? 0,
+            taxRate: item.taxRate,
+            unit: item.unit || null,
+            serviceDate: item.serviceDate ?? null,
+            discountAmount: item.discountAmount ?? 0,
+            discountPercent: item.discountPercent ?? 0,
+            sortOrder: item.sortOrder ?? idx,
+          }))
+        );
+      }
 
-    return this.getById(tenantId, invoice.id);
+      return tx.query.invoices.findFirst({
+        where: and(eq(invoices.id, invoice.id), eq(invoices.tenantId, tenantId)),
+        with: { customer: true, items: true, cancelsInvoice: { columns: { invoiceNumber: true, issueDate: true } } },
+      });
+    });
   }
 
   async createFromOrder(tenantId: string, orderId: string) {
@@ -110,7 +163,6 @@ export class InvoicesService {
     });
     if (!order) throw errors.notFound('Order');
 
-    // Fetch purchase prices for part items that are linked to catalog parts
     const partIds = order.items.filter(i => i.partId).map(i => i.partId as string);
     const partPrices = new Map<string, number>();
     if (partIds.length > 0) {
@@ -123,16 +175,20 @@ export class InvoicesService {
       }
     }
 
-    const today = new Date().toISOString().split('T')[0];
-    const dueDate = new Date();
-    dueDate.setDate(dueDate.getDate() + 14);
+    const todayStr = today();
+    const due = new Date();
+    due.setDate(due.getDate() + 14);
+
+    const serviceDate = order.estimatedDone
+      ? order.estimatedDone.toISOString().split('T')[0]
+      : todayStr;
 
     return this.create(tenantId, {
       type: 'invoice',
       customerId: order.customerId,
       orderId,
-      issueDate: today,
-      dueDate: dueDate.toISOString().split('T')[0],
+      serviceDate,
+      dueDate: due.toISOString().split('T')[0],
       items: order.items.map(item => ({
         type: item.type,
         description: item.description,
@@ -148,23 +204,30 @@ export class InvoicesService {
 
   async update(tenantId: string, id: string, data: {
     type?: 'invoice' | 'quote' | 'credit_note';
-    issueDate?: string;
+    serviceDate?: string | null;
     dueDate?: string;
     notes?: string;
     orderId?: string;
-    items?: Array<{ type?: 'labor' | 'part' | 'misc'; description: string; quantity: number; unitPrice: number; unitCost?: number; taxRate: number; unit?: string; sortOrder?: number }>;
+    skontoPercent?: number | null;
+    skontoDays?: number | null;
+    items?: ItemInput[];
   }) {
+    await assertSmallBusinessRule(tenantId, data.items);
+
     const invoice = await db.query.invoices.findFirst({
       where: and(eq(invoices.id, id), eq(invoices.tenantId, tenantId)),
     });
     if (!invoice) throw errors.notFound('Invoice');
     if (invoice.status !== 'draft') throw errors.badRequest('Nur Entwürfe können bearbeitet werden');
 
+    // issueDate wird NIE manuell gesetzt — beim Promote durch updateStatus.
     await db.update(invoices)
       .set({
         type: data.type ?? invoice.type,
-        issueDate: data.issueDate ?? invoice.issueDate,
+        serviceDate: data.serviceDate !== undefined ? data.serviceDate : invoice.serviceDate,
         dueDate: data.dueDate !== undefined ? data.dueDate : invoice.dueDate,
+        skontoPercent: data.skontoPercent !== undefined ? data.skontoPercent : invoice.skontoPercent,
+        skontoDays: data.skontoDays !== undefined ? data.skontoDays : invoice.skontoDays,
         notes: data.notes !== undefined ? data.notes : invoice.notes,
         orderId: data.orderId !== undefined ? data.orderId : invoice.orderId,
         updatedAt: new Date(),
@@ -179,11 +242,14 @@ export class InvoicesService {
             invoiceId: id,
             type: item.type ?? 'misc',
             description: item.description,
-            quantity: String(item.quantity),
-            unitPrice: String(item.unitPrice),
-            unitCost: String(item.unitCost ?? 0),
-            taxRate: String(item.taxRate),
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            unitCost: item.unitCost ?? 0,
+            taxRate: item.taxRate,
             unit: item.unit || null,
+            serviceDate: item.serviceDate ?? null,
+            discountAmount: item.discountAmount ?? 0,
+            discountPercent: item.discountPercent ?? 0,
             sortOrder: item.sortOrder ?? idx,
           }))
         );
@@ -197,13 +263,14 @@ export class InvoicesService {
     type?: 'invoice' | 'quote' | 'credit_note';
     customerId?: string;
     orderId?: string;
-    issueDate?: string;
+    serviceDate?: string | null;
     dueDate?: string;
     notes?: string;
-    items?: Array<{ type?: 'labor' | 'part' | 'misc'; description?: string; quantity?: number; unitPrice?: number; unitCost?: number; taxRate?: number; unit?: string; sortOrder?: number }>;
+    skontoPercent?: number | null;
+    skontoDays?: number | null;
+    items?: DraftItemInput[];
   }) {
-    // Per D-06: 'DRAFT-' + 8-char UUID segment. Strip dashes first, then take 8 chars.
-    // DO NOT call create() — that increments tenants.invoiceCounter. Drafts MUST NOT consume the counter.
+    // 'DRAFT-' + 8-char UUID. Konsumiert NICHT den Counter — wird erst beim Promote gezogen.
     const invoiceNumber = `DRAFT-${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
 
     const [invoice] = await db.insert(invoices).values({
@@ -213,13 +280,14 @@ export class InvoicesService {
       type: data.type ?? 'invoice',
       customerId: data.customerId ?? null,
       orderId: data.orderId,
-      issueDate: data.issueDate ?? null,
+      issueDate: null,                        // Drafts haben kein issueDate — wird beim Promote gesetzt
+      serviceDate: data.serviceDate ?? null,
       dueDate: data.dueDate,
+      skontoPercent: data.skontoPercent ?? null,
+      skontoDays: data.skontoDays ?? null,
       notes: data.notes,
     }).returning();
 
-    // Filter items lacking description — invoice_items.description is NOT NULL at DB level.
-    // Empty items array is valid per D-05.
     if (data.items && data.items.length > 0) {
       const validItems = data.items.filter(i => i.description && i.description.trim().length > 0);
       if (validItems.length > 0) {
@@ -228,11 +296,14 @@ export class InvoicesService {
             invoiceId: invoice.id,
             type: item.type ?? 'misc',
             description: item.description!,
-            quantity: String(item.quantity ?? 1),
-            unitPrice: String(item.unitPrice ?? 0),
-            unitCost: String(item.unitCost ?? 0),
-            taxRate: String(item.taxRate ?? 20),
+            quantity: item.quantity ?? 1,
+            unitPrice: item.unitPrice ?? 0,
+            unitCost: item.unitCost ?? 0,
+            taxRate: item.taxRate ?? 19,
             unit: item.unit || null,
+            serviceDate: item.serviceDate ?? null,
+            discountAmount: item.discountAmount ?? 0,
+            discountPercent: item.discountPercent ?? 0,
             sortOrder: item.sortOrder ?? idx,
           }))
         );
@@ -246,10 +317,12 @@ export class InvoicesService {
     type?: 'invoice' | 'quote' | 'credit_note';
     customerId?: string;
     orderId?: string;
-    issueDate?: string;
+    serviceDate?: string | null;
     dueDate?: string;
     notes?: string;
-    items?: Array<{ type?: 'labor' | 'part' | 'misc'; description?: string; quantity?: number; unitPrice?: number; unitCost?: number; taxRate?: number; unit?: string; sortOrder?: number }>;
+    skontoPercent?: number | null;
+    skontoDays?: number | null;
+    items?: DraftItemInput[];
   }) {
     const existing = await db.query.invoices.findFirst({
       where: and(eq(invoices.id, id), eq(invoices.tenantId, tenantId)),
@@ -262,15 +335,15 @@ export class InvoicesService {
         type: data.type ?? existing.type,
         customerId: data.customerId !== undefined ? data.customerId : existing.customerId,
         orderId: data.orderId !== undefined ? data.orderId : existing.orderId,
-        issueDate: data.issueDate !== undefined ? data.issueDate : existing.issueDate,
+        serviceDate: data.serviceDate !== undefined ? data.serviceDate : existing.serviceDate,
         dueDate: data.dueDate !== undefined ? data.dueDate : existing.dueDate,
+        skontoPercent: data.skontoPercent !== undefined ? data.skontoPercent : existing.skontoPercent,
+        skontoDays: data.skontoDays !== undefined ? data.skontoDays : existing.skontoDays,
         notes: data.notes !== undefined ? data.notes : existing.notes,
         updatedAt: new Date(),
       })
       .where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId)));
 
-    // CRITICAL D-03 semantics: items wiped+replaced ONLY if data.items is explicitly provided (not undefined).
-    // A PATCH body without `items` MUST leave existing items untouched.
     if (data.items !== undefined) {
       await db.delete(invoiceItems).where(eq(invoiceItems.invoiceId, id));
       const validItems = data.items.filter(i => i.description && i.description.trim().length > 0);
@@ -280,11 +353,14 @@ export class InvoicesService {
             invoiceId: id,
             type: item.type ?? 'misc',
             description: item.description!,
-            quantity: String(item.quantity ?? 1),
-            unitPrice: String(item.unitPrice ?? 0),
-            unitCost: String(item.unitCost ?? 0),
-            taxRate: String(item.taxRate ?? 20),
+            quantity: item.quantity ?? 1,
+            unitPrice: item.unitPrice ?? 0,
+            unitCost: item.unitCost ?? 0,
+            taxRate: item.taxRate ?? 19,
             unit: item.unit || null,
+            serviceDate: item.serviceDate ?? null,
+            discountAmount: item.discountAmount ?? 0,
+            discountPercent: item.discountPercent ?? 0,
             sortOrder: item.sortOrder ?? idx,
           }))
         );
@@ -306,15 +382,132 @@ export class InvoicesService {
   }
 
   async updateStatus(tenantId: string, id: string, status: InvoiceStatus) {
-    const updates: Partial<typeof invoices.$inferInsert> = { status, updatedAt: new Date() };
-    if (status === 'paid') updates.paidAt = new Date();
+    return db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select()
+        .from(invoices)
+        .where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId)))
+        .for('update');
+      if (!existing) throw errors.notFound('Invoice');
 
-    const [updated] = await db.update(invoices)
-      .set(updates)
-      .where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId)))
-      .returning();
-    if (!updated) throw errors.notFound('Invoice');
-    return this.getById(tenantId, updated.id);
+      const updates: Partial<typeof invoices.$inferInsert> = { status, updatedAt: new Date() };
+      if (status === 'paid') updates.paidAt = new Date();
+
+      // Promote: DRAFT → echte Rechnung. Pflichtfelder erzwingen.
+      const isLeavingDraft =
+        existing.invoiceNumber.startsWith('DRAFT-') && status !== 'draft';
+
+      if (isLeavingDraft) {
+        if (!existing.dueDate) {
+          throw errors.badRequest('Fälligkeitsdatum ist Pflicht vor dem Versand.');
+        }
+        const [tenant] = await tx
+          .update(tenants)
+          .set({ invoiceCounter: sql`${tenants.invoiceCounter} + 1` })
+          .where(eq(tenants.id, tenantId))
+          .returning();
+        updates.invoiceNumber = `${tenant.invoicePrefix}-${String(tenant.invoiceCounter).padStart(5, '0')}`;
+        // Ausstellungsdatum IMMER beim Promote = jetzt (User darf es nicht vorab setzen).
+        updates.issueDate = today();
+        if (existing.serviceDate == null) updates.serviceDate = updates.issueDate;
+      }
+
+      const [updated] = await tx
+        .update(invoices)
+        .set(updates)
+        .where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId)))
+        .returning();
+      if (!updated) throw errors.notFound('Invoice');
+
+      return tx.query.invoices.findFirst({
+        where: and(eq(invoices.id, updated.id), eq(invoices.tenantId, tenantId)),
+        with: { customer: true, items: true, cancelsInvoice: { columns: { invoiceNumber: true, issueDate: true } } },
+      });
+    });
+  }
+
+  /**
+   * Storno: erzeugt eine credit_note mit eigenem Nummernkreis (cancelInvoicePrefix-NNNNN),
+   * spiegelt Items mit negativen Mengen, setzt Original auf 'cancelled'.
+   * Original muss 'sent' oder 'paid' sein. Atomar.
+   */
+  async cancelInvoice(tenantId: string, id: string) {
+    return db.transaction(async (tx) => {
+      const [original] = await tx
+        .select()
+        .from(invoices)
+        .where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId)))
+        .for('update');
+      if (!original) throw errors.notFound('Invoice');
+      if (original.type !== 'invoice') {
+        throw errors.badRequest('Nur Rechnungen können storniert werden, keine Stornos oder Angebote.');
+      }
+      if (original.status !== 'sent' && original.status !== 'paid') {
+        throw errors.badRequest('Nur offene oder bezahlte Rechnungen können storniert werden.');
+      }
+      if (original.cancelsInvoiceId) {
+        throw errors.badRequest('Diese Rechnung ist bereits eine Stornorechnung.');
+      }
+
+      const originalItems = await tx.query.invoiceItems.findMany({
+        where: eq(invoiceItems.invoiceId, original.id),
+      });
+
+      // Storno-Nummer aus dedizietem Counter
+      const [tenant] = await tx
+        .update(tenants)
+        .set({ cancelInvoiceCounter: sql`${tenants.cancelInvoiceCounter} + 1` })
+        .where(eq(tenants.id, tenantId))
+        .returning();
+      const cancelNumber = `${tenant.cancelInvoicePrefix}-${String(tenant.cancelInvoiceCounter).padStart(5, '0')}`;
+
+      const issueDate = today();
+      const [storno] = await tx.insert(invoices).values({
+        tenantId,
+        invoiceNumber: cancelNumber,
+        type: 'credit_note',
+        status: 'sent',                              // Storno ist sofort offen/aktiv
+        customerId: original.customerId,
+        orderId: original.orderId,
+        cancelsInvoiceId: original.id,
+        issueDate,
+        serviceDate: original.serviceDate ?? issueDate,
+        dueDate: issueDate,                          // sofort fällig (informativ)
+        skontoPercent: null,
+        skontoDays: null,
+        notes: `Stornorechnung zu Rechnung ${original.invoiceNumber} vom ${original.issueDate ?? '-'}.`,
+      }).returning();
+
+      if (originalItems.length > 0) {
+        await tx.insert(invoiceItems).values(
+          originalItems.map((item, idx) => ({
+            invoiceId: storno.id,
+            type: item.type,
+            description: item.description,
+            // Negativ: Mengen invertieren — netTotal kommt automatisch negativ raus.
+            quantity: -Number(item.quantity),
+            unitPrice: item.unitPrice,
+            unitCost: item.unitCost,
+            taxRate: item.taxRate,
+            unit: item.unit,
+            serviceDate: item.serviceDate,
+            discountAmount: item.discountAmount,
+            discountPercent: item.discountPercent,
+            sortOrder: item.sortOrder ?? idx,
+          }))
+        );
+      }
+
+      // Original auf cancelled
+      await tx.update(invoices)
+        .set({ status: 'cancelled', updatedAt: new Date() })
+        .where(eq(invoices.id, original.id));
+
+      return tx.query.invoices.findFirst({
+        where: and(eq(invoices.id, storno.id), eq(invoices.tenantId, tenantId)),
+        with: { customer: true, items: true, cancelsInvoice: { columns: { invoiceNumber: true, issueDate: true } } },
+      });
+    });
   }
 }
 

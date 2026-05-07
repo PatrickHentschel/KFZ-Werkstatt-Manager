@@ -82,7 +82,7 @@ function VendorDialog({
                   type="email"
                   value={form.email}
                   onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                  placeholder="info@lieferant.at"
+                  placeholder="info@lieferant.de"
                 />
               </div>
               <div className="space-y-1">
@@ -90,7 +90,7 @@ function VendorDialog({
                 <Input
                   value={form.phone}
                   onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                  placeholder="+43 1 234 5678"
+                  placeholder="+49 30 1234567"
                 />
               </div>
             </div>
@@ -107,7 +107,7 @@ function VendorDialog({
               <Input
                 value={form.address}
                 onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
-                placeholder="Musterstraße 1, Wien"
+                placeholder="Musterstraße 1, Berlin"
               />
             </div>
             <div className="space-y-1">
