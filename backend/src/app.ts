@@ -16,7 +16,6 @@ import staffRoutes from './modules/staff/staff.routes';
 import reportsRoutes from './modules/reports/reports.routes';
 import settingsRoutes from './modules/settings/settings.routes';
 import dashboardRoutes from './modules/dashboard/dashboard.routes';
-import paymentsRoutes from './modules/payments/payments.routes';
 import { db, type DB } from './db';
 import { AppError } from './utils/errors';
 
@@ -76,7 +75,6 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(reportsRoutes, { prefix: '/api/v1/reports' });
   await fastify.register(settingsRoutes, { prefix: '/api/v1/settings' });
   await fastify.register(dashboardRoutes, { prefix: '/api/v1/dashboard' });
-  await fastify.register(paymentsRoutes, { prefix: '/api/v1/payments' });
 
   // Health check
   fastify.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));

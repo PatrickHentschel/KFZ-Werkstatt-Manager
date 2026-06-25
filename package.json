@@ -2,13 +2,18 @@
   "name": "werkstattclone",
   "version": "1.0.0",
   "private": true,
-  "workspaces": ["packages/*", "backend", "frontend"],
+  "workspaces": [
+    "packages/*",
+    "backend",
+    "frontend"
+  ],
   "scripts": {
     "dev": "docker-compose up",
     "dev:backend": "npm run dev --workspace=backend",
     "dev:frontend": "npm run dev --workspace=frontend",
     "build": "npm run build --workspace=packages/shared && npm run build --workspace=backend && npm run build --workspace=frontend",
     "db:migrate": "npm run db:migrate --workspace=backend",
-    "db:seed": "npm run db:seed --workspace=backend"
+    "db:seed": "npm run db:seed --workspace=backend",
+    "reset": "docker-compose down -v && docker-compose up -d && sleep 5 && npm run db:migrate && npm run db:seed"
   }
 }
