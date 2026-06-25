@@ -1,12 +1,13 @@
 import fp from 'fastify-plugin';
 import { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import jwt from 'jsonwebtoken';
+import { eq } from 'drizzle-orm';
 import type { PoolClient } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { JwtPayload } from '@werkstatt/shared';
+import { JwtPayload, UserRole } from '@werkstatt/shared';
 import { config } from '../config';
-import { errors } from '../utils/errors';
-import { pool, tenantDbStore, type DB } from '../db';
+import { db, pool, tenantDbStore, type DB } from '../db';
+import { users } from '../db/schema';
 import * as schema from '../db/schema';
 
 declare module 'fastify' {
@@ -38,7 +39,24 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
       return reply.code(401).send({ statusCode: 401, error: 'Unauthorized', message: 'Invalid token' });
     }
 
-    request.user = payload;
+    // Live-Check gegen DB: deaktivierte User dürfen sofort raus, nicht erst
+    // nach Token-Expiry. Tenant-Mismatch (User in anderen Tenant verschoben)
+    // wird ebenfalls hier geblockt. users-Tabelle ist RLS-exempt → raw db OK.
+    const dbUser = await db.query.users.findFirst({
+      where: eq(users.id, payload.sub),
+      columns: { id: true, tenantId: true, role: true, isActive: true, email: true },
+    });
+    if (!dbUser || !dbUser.isActive || dbUser.tenantId !== payload.tenantId) {
+      return reply.code(401).send({ statusCode: 401, error: 'Unauthorized', message: 'Account inactive or invalid' });
+    }
+
+    // Aktuelle Rolle aus DB ziehen — JWT könnte stale sein wenn Rolle downgraded wurde.
+    request.user = {
+      sub: dbUser.id,
+      tenantId: dbUser.tenantId,
+      role: dbUser.role as UserRole,
+      email: dbUser.email,
+    };
 
     // Check out a dedicated connection for this request and set the tenant
     // context GUC so Postgres RLS policies can enforce tenant isolation.
@@ -54,7 +72,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     try {
       await pgClient.query(
         "SELECT set_config('app.current_tenant_id', $1, false)",
-        [payload.tenantId],
+        [request.user.tenantId],
       );
     } catch (err) {
       pgClient.release();

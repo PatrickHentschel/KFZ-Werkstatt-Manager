@@ -6,6 +6,8 @@ import { db } from '../../db';
 import { tenants } from '../../db/schema/tenants';
 import { customers } from '../../db/schema/customers';
 import { generateInvoicePdf } from '../../utils/pdf';
+import { generateXRechnung, XRechnungError } from '../../utils/xrechnung';
+import { getOrPersistDocument, readDocument } from '../../utils/invoice-storage';
 import { sendEmail } from '../../utils/email';
 
 const invoiceItemSchema = z.object({
@@ -173,10 +175,42 @@ const invoicesRoutes: FastifyPluginAsync = async (fastify) => {
       : initial;
 
     const tenant = await db.query.tenants.findFirst({ where: eq(tenants.id, tenantId) });
-    const pdfBuffer = await generateInvoicePdf(invoice as any, tenant!);
+    // §147 AO: PDF write-once persistieren. Re-Send liefert dieselbe Datei.
+    const pdfBuffer = await getOrPersistDocument(
+      tenantId, id, 'pdf',
+      () => generateInvoicePdf(invoice as any, tenant!),
+    );
     const customerName = customer.type === 'business'
       ? (customer.companyName || `${customer.firstName} ${customer.lastName}`)
       : `${customer.firstName || ''} ${customer.lastName || ''}`.trim();
+
+    const attachments: Array<{ filename: string; content: Buffer | string; contentType: string }> = [
+      {
+        filename: `${invoice!.invoiceNumber}.pdf`,
+        content: pdfBuffer,
+        contentType: 'application/pdf',
+      },
+    ];
+
+    // XRechnung nur für B2B + echte Belege (keine Angebote). E-Rechnungspflicht
+    // ab 2025 (Empfang) bzw. 2027/2028 (Versand). XRechnungError soll den
+    // Mail-Versand nicht blockieren — PDF bleibt Primärformat.
+    if (customer.type === 'business' && invoice!.type !== 'quote') {
+      try {
+        const xml = await getOrPersistDocument(
+          tenantId, id, 'xrechnung',
+          () => generateXRechnung(invoice as any, tenant!),
+        );
+        attachments.push({
+          filename: `${invoice!.invoiceNumber}.xml`,
+          content: xml,
+          contentType: 'application/xml',
+        });
+      } catch (err) {
+        const reason = err instanceof XRechnungError ? err.message : String(err);
+        request.log.warn({ invoiceId: id, reason }, 'XRechnung-Anhang übersprungen');
+      }
+    }
 
     await sendEmail({
       to: customer.email,
@@ -188,28 +222,58 @@ const invoicesRoutes: FastifyPluginAsync = async (fastify) => {
         <p>Bei Fragen stehen wir Ihnen gerne zur Verfügung.</p>
         <p>Mit freundlichen Grüßen,<br>${tenant!.name}</p>
       `,
-      attachments: [
-        {
-          filename: `${invoice!.invoiceNumber}.pdf`,
-          content: pdfBuffer,
-          contentType: 'application/pdf',
-        },
-      ],
+      attachments,
     });
 
     return reply.code(204).send();
   });
 
+  // GET /:id/pdf:
+  //   - festgeschriebener Beleg (sent/paid/cancelled): aus Archiv lesen (§147 AO)
+  //   - Draft/Quote: live-Render (Vorschau)
   fastify.get('/:id/pdf', async (request, reply) => {
     const { id } = request.params as { id: string };
     const tenantId = request.user.tenantId;
     const invoice = await invoicesService.getById(tenantId, id);
     const tenant = await db.query.tenants.findFirst({ where: eq(tenants.id, tenantId) });
-    const pdfBuffer = await generateInvoicePdf(invoice, tenant!);
+
+    const archived = invoice.status !== 'draft'
+      ? await readDocument(tenantId, id, 'pdf')
+      : null;
+    const pdfBuffer = archived ?? await generateInvoicePdf(invoice, tenant!);
+
     return reply
       .header('Content-Type', 'application/pdf')
       .header('Content-Disposition', `attachment; filename="${invoice.invoiceNumber}.pdf"`)
       .send(pdfBuffer);
+  });
+
+  // GET /:id/xrechnung — UBL 2.1 / XRechnung 3.0 XML.
+  // Pflicht für DE-B2G; ab 2025/2027 schrittweise auch B2B.
+  // Drafts (issueDate=null) und Angebote sind ausgeschlossen — XRechnungError → 422.
+  // Festgeschriebene Belege: archivierte Version (§147 AO), sonst live-Render.
+  fastify.get('/:id/xrechnung', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const tenantId = request.user.tenantId;
+    const invoice = await invoicesService.getById(tenantId, id);
+    const tenant = await db.query.tenants.findFirst({ where: eq(tenants.id, tenantId) });
+
+    try {
+      const archived = invoice.status !== 'draft'
+        ? await readDocument(tenantId, id, 'xrechnung')
+        : null;
+      const xml = archived ?? generateXRechnung(invoice as any, tenant!);
+
+      return reply
+        .header('Content-Type', 'application/xml; charset=utf-8')
+        .header('Content-Disposition', `attachment; filename="${invoice.invoiceNumber}.xml"`)
+        .send(xml);
+    } catch (err) {
+      if (err instanceof XRechnungError) {
+        return reply.code(422).send({ statusCode: 422, error: 'Unprocessable Entity', message: err.message });
+      }
+      throw err;
+    }
   });
 };
 

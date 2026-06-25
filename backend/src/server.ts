@@ -5,6 +5,7 @@ dotenv.config({ path: path.join(__dirname, '../.env') });
 
 import { buildApp } from './app';
 import { startAppointmentReminderJob } from './jobs/appointmentReminders';
+import { startRefreshTokenCleanupJob } from './jobs/refreshTokenCleanup';
 
 async function main() {
   const app = await buildApp();
@@ -19,6 +20,10 @@ async function main() {
     startAppointmentReminderJob();
     app.log.info('Appointment reminder job started');
   }
+
+  // Refresh-Token-Cleanup ist DB-only, läuft immer.
+  startRefreshTokenCleanupJob();
+  app.log.info('Refresh token cleanup job started');
 }
 
 main().catch((err) => {

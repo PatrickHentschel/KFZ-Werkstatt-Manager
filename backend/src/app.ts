@@ -35,8 +35,20 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   // Register plugins
   await fastify.register(fastifyHelmet, { contentSecurityPolicy: false });
+  // LAN-friendly CORS: explicit FRONTEND_URL plus localhost / private RFC1918 ranges in dev
+  const LAN_ORIGIN_RE =
+    /^https?:\/\/(localhost|127\.0\.0\.1|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}|[a-z0-9-]+\.local)(:\d+)?$/i;
+  const explicitOrigin = process.env.FRONTEND_URL;
   await fastify.register(fastifyCors, {
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: (origin, cb) => {
+      // Same-origin / curl / server-to-server (no Origin header)
+      if (!origin) return cb(null, true);
+      if (explicitOrigin && origin === explicitOrigin) return cb(null, true);
+      if (process.env.NODE_ENV !== 'production' && LAN_ORIGIN_RE.test(origin)) {
+        return cb(null, true);
+      }
+      return cb(new AppError(403, 'Forbidden', `Origin ${origin} not allowed`), false);
+    },
     credentials: true,
   });
   await fastify.register(fastifyCookie);

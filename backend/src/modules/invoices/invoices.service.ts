@@ -7,6 +7,20 @@ import { getPaginationParams, buildPaginatedResponse } from '../../utils/paginat
 
 type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'cancelled';
 
+/**
+ * Erlaubte Status-Übergänge via updateStatus.
+ * - paid und cancelled sind terminal — Korrektur nur via Stornorechnung (cancelInvoice).
+ * - sent → cancelled ist gesperrt: festgeschriebene Belege dürfen nicht mehr verschwinden.
+ *   Stornieren nur über cancelInvoice (erzeugt credit_note + setzt Original auf cancelled).
+ * - Identitäts-Übergang (z. B. sent → sent) ist no-op und erlaubt.
+ */
+const ALLOWED_TRANSITIONS: Record<InvoiceStatus, InvoiceStatus[]> = {
+  draft:     ['draft', 'sent'],
+  sent:      ['sent', 'paid'],
+  paid:      ['paid'],
+  cancelled: ['cancelled'],
+};
+
 type ItemInput = {
   type?: 'labor' | 'part' | 'misc';
   description: string;
@@ -125,8 +139,8 @@ export class InvoicesService {
         issueDate,
         serviceDate: data.serviceDate ?? issueDate,
         dueDate: data.dueDate,
-        skontoPercent: data.skontoPercent ?? null,
-        skontoDays: data.skontoDays ?? null,
+        skontoPercent: data.skontoPercent ?? 0,
+        skontoDays: data.skontoDays ?? 0,
         notes: data.notes,
       }).returning();
 
@@ -157,6 +171,11 @@ export class InvoicesService {
   }
 
   async createFromOrder(tenantId: string, orderId: string) {
+    const existing = await db.query.invoices.findFirst({
+      where: and(eq(invoices.orderId, orderId), eq(invoices.tenantId, tenantId)),
+    });
+    if (existing) return existing;
+
     const order = await db.query.orders.findFirst({
       where: and(eq(orders.id, orderId), eq(orders.tenantId, tenantId)),
       with: { items: true },
@@ -189,6 +208,9 @@ export class InvoicesService {
       orderId,
       serviceDate,
       dueDate: due.toISOString().split('T')[0],
+      // Auftrags-Skonto 1:1 in die Rechnung übernehmen.
+      skontoPercent: Number(order.skontoPercent),
+      skontoDays: Number(order.skontoDays),
       items: order.items.map(item => ({
         type: item.type,
         description: item.description,
@@ -197,6 +219,9 @@ export class InvoicesService {
         unitCost: item.partId ? (partPrices.get(item.partId) ?? 0) : 0,
         taxRate: Number(item.taxRate),
         unit: item.unit || undefined,
+        // Per-Item Rabatt 1:1 übernehmen.
+        discountAmount: Number(item.discountAmount),
+        discountPercent: Number(item.discountPercent),
         sortOrder: item.sortOrder,
       })),
     });
@@ -226,8 +251,9 @@ export class InvoicesService {
         type: data.type ?? invoice.type,
         serviceDate: data.serviceDate !== undefined ? data.serviceDate : invoice.serviceDate,
         dueDate: data.dueDate !== undefined ? data.dueDate : invoice.dueDate,
-        skontoPercent: data.skontoPercent !== undefined ? data.skontoPercent : invoice.skontoPercent,
-        skontoDays: data.skontoDays !== undefined ? data.skontoDays : invoice.skontoDays,
+        // null-Eingaben aus Form clearen das Feld auf 0 (Default).
+        skontoPercent: data.skontoPercent !== undefined ? (data.skontoPercent ?? 0) : invoice.skontoPercent,
+        skontoDays: data.skontoDays !== undefined ? (data.skontoDays ?? 0) : invoice.skontoDays,
         notes: data.notes !== undefined ? data.notes : invoice.notes,
         orderId: data.orderId !== undefined ? data.orderId : invoice.orderId,
         updatedAt: new Date(),
@@ -283,8 +309,8 @@ export class InvoicesService {
       issueDate: null,                        // Drafts haben kein issueDate — wird beim Promote gesetzt
       serviceDate: data.serviceDate ?? null,
       dueDate: data.dueDate,
-      skontoPercent: data.skontoPercent ?? null,
-      skontoDays: data.skontoDays ?? null,
+      skontoPercent: data.skontoPercent ?? 0,
+      skontoDays: data.skontoDays ?? 0,
       notes: data.notes,
     }).returning();
 
@@ -337,8 +363,8 @@ export class InvoicesService {
         orderId: data.orderId !== undefined ? data.orderId : existing.orderId,
         serviceDate: data.serviceDate !== undefined ? data.serviceDate : existing.serviceDate,
         dueDate: data.dueDate !== undefined ? data.dueDate : existing.dueDate,
-        skontoPercent: data.skontoPercent !== undefined ? data.skontoPercent : existing.skontoPercent,
-        skontoDays: data.skontoDays !== undefined ? data.skontoDays : existing.skontoDays,
+        skontoPercent: data.skontoPercent !== undefined ? (data.skontoPercent ?? 0) : existing.skontoPercent,
+        skontoDays: data.skontoDays !== undefined ? (data.skontoDays ?? 0) : existing.skontoDays,
         notes: data.notes !== undefined ? data.notes : existing.notes,
         updatedAt: new Date(),
       })
@@ -389,6 +415,17 @@ export class InvoicesService {
         .where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId)))
         .for('update');
       if (!existing) throw errors.notFound('Invoice');
+
+      // Transition-Guard: paid/cancelled sind terminal, sent → cancelled muss über cancelInvoice.
+      const currentStatus = existing.status as InvoiceStatus;
+      if (!ALLOWED_TRANSITIONS[currentStatus].includes(status)) {
+        throw errors.badRequest(
+          `Statuswechsel ${currentStatus} → ${status} nicht erlaubt. ` +
+          (currentStatus === 'sent' && status === 'cancelled'
+            ? 'Versendete Rechnungen müssen storniert werden (POST /:id/cancel).'
+            : 'Festgeschriebene Belege dürfen nicht mehr mutiert werden.')
+        );
+      }
 
       const updates: Partial<typeof invoices.$inferInsert> = { status, updatedAt: new Date() };
       if (status === 'paid') updates.paidAt = new Date();
@@ -473,8 +510,8 @@ export class InvoicesService {
         issueDate,
         serviceDate: original.serviceDate ?? issueDate,
         dueDate: issueDate,                          // sofort fällig (informativ)
-        skontoPercent: null,
-        skontoDays: null,
+        skontoPercent: 0,
+        skontoDays: 0,
         notes: `Stornorechnung zu Rechnung ${original.invoiceNumber} vom ${original.issueDate ?? '-'}.`,
       }).returning();
 

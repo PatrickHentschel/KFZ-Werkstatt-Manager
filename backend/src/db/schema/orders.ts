@@ -19,6 +19,9 @@ export const orders = pgTable('orders', {
   estimatedDone: timestamp('estimated_done'),
   assignedStaffId: uuid('assigned_staff_id'),
   notes: text('notes'),
+  // Skonto wird beim Promote in die Rechnung übernommen. Default 0 = nicht aktiv.
+  skontoPercent: decimal('skonto_percent', { precision: 5, scale: 2, mode: 'number' }).notNull().default(0),
+  skontoDays: integer('skonto_days').notNull().default(0),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
@@ -30,6 +33,10 @@ export const orderItems = pgTable('order_items', {
   description: text('description').notNull(),
   quantity: decimal('quantity', { precision: 10, scale: 2, mode: 'number' }).notNull().default(1),
   unitPrice: decimal('unit_price', { precision: 10, scale: 2, mode: 'number' }).notNull(),
+  // Per-Item Rabatt: kein Pflichtfeld, Default 0.
+  // Beim Promote in die Rechnung 1:1 übernommen.
+  discountAmount: decimal('discount_amount', { precision: 10, scale: 2, mode: 'number' }).notNull().default(0),
+  discountPercent: decimal('discount_percent', { precision: 5, scale: 2, mode: 'number' }).notNull().default(0),
   taxRate: decimal('tax_rate', { precision: 5, scale: 2, mode: 'number' }).notNull().default(19.00),
   unit: varchar('unit', { length: 10 }),
   partId: uuid('part_id'),

@@ -7,6 +7,9 @@ export interface OrderItem {
   id: string; orderId: string; type: 'labor' | 'part' | 'misc';
   description: string; quantity: number; unitPrice: number; taxRate: number; unit?: string; sortOrder: number;
   partId?: string;
+  // Rabatt: Default 0, wird beim Promote in die Rechnung übernommen.
+  discountAmount: number;
+  discountPercent: number;
 }
 
 export interface Order {
@@ -15,6 +18,9 @@ export interface Order {
   description?: string; mileageIn?: number; mileageOut?: number;
   estimatedDone?: string; notes?: string;
   assignedStaffId?: string;
+  // Skonto: Default 0, wird beim Promote in die Rechnung übernommen.
+  skontoPercent: number;
+  skontoDays: number;
   items: OrderItem[];
   customer?: { id: string; firstName?: string; lastName?: string; companyName?: string; };
   vehicle?: { id: string; licensePlate: string; make: string; model: string; };
@@ -50,12 +56,14 @@ export const ordersApi = {
     description?: string;
     mileageIn?: number;
     assignedStaffId?: string;
+    skontoPercent?: number;
+    skontoDays?: number;
   }) => apiClient.post<Order>('/orders', data),
   update: (id: string, data: Partial<Order>) => apiClient.patch<Order>(`/orders/${id}`, data),
   updateStatus: (id: string, status: OrderStatus) => apiClient.patch<Order>(`/orders/${id}/status`, { status }),
   updateItems: (id: string, items: Omit<OrderItem, 'id' | 'orderId'>[]) =>
     apiClient.put<Order>(`/orders/${id}/items`, { items }),
-  createInvoice: (id: string) => apiClient.post(`/orders/${id}/invoice`),
+  createInvoice: (id: string) => apiClient.post<{ id: string }>(`/orders/${id}/invoice`),
   getTimeEntries: (id: string) =>
     apiClient.get<TimeEntryWithStaff[]>(`/orders/${id}/time-entries`),
   addTimeEntry: (id: string, data: { staffId: string; description?: string; durationMinutes: number }) =>

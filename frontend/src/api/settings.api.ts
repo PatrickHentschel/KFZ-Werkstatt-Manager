@@ -20,6 +20,7 @@ export interface TenantSettings {
   plan: string;
   logoUrl?: string;
   awMinutes: number;
+  awRate: number;
 }
 
 export const settingsApi = {

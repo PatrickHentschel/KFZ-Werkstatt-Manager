@@ -3,6 +3,36 @@ import { eq, and, gte, lte, sql } from 'drizzle-orm';
 import { db } from '../../db';
 import { orders, invoices, timeEntries, staff } from '../../db/schema';
 
+/**
+ * Berechnet den effektiven Netto-Betrag einer Rechnungsposition unter
+ * Berücksichtigung beider Rabatt-Varianten (% und €).
+ *
+ * Reihenfolge: erst prozentualer Rabatt vom Brutto, dann absoluter Rabatt.
+ * Konsistent mit InvoiceFormPage-Total-Berechnung. Cap bei 0, damit
+ * absurd hohe Pauschal-Rabatte nicht zu negativem Netto führen.
+ */
+function itemNet(item: {
+  quantity: number | string;
+  unitPrice: number | string;
+  discountPercent?: number | string | null;
+  discountAmount?: number | string | null;
+}): number {
+  const qty = Number(item.quantity);
+  const price = Number(item.unitPrice);
+  const gross = qty * price;
+  const dPct = Number(item.discountPercent ?? 0);
+  const dAbs = Number(item.discountAmount ?? 0);
+  return Math.max(0, gross - gross * (dPct / 100) - dAbs);
+}
+
+/**
+ * Wareneinsatz/Personal-Kosten einer Position. Rabatt mindert NICHT den EK —
+ * wir zahlen den Lieferanten unabhängig vom Kunden-Rabatt voll.
+ */
+function itemCost(item: { quantity: number | string; unitCost?: number | string | null }): number {
+  return Number(item.unitCost ?? 0) * Number(item.quantity);
+}
+
 const reportsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('preHandler', fastify.authenticate);
   fastify.addHook('preHandler', fastify.requireRole('owner', 'admin'));
@@ -33,10 +63,8 @@ const reportsRoutes: FastifyPluginAsync = async (fastify) => {
 
     for (const inv of paidInvoices) {
       for (const item of inv.items) {
-        const qty = Number(item.quantity);
-        const price = Number(item.unitPrice);
         const tax = Number(item.taxRate) / 100;
-        const net = qty * price;
+        const net = itemNet(item);
         totalNet += net;
         totalTax += net * tax;
         totalGross += net * (1 + tax);
@@ -129,7 +157,7 @@ const reportsRoutes: FastifyPluginAsync = async (fastify) => {
       const existing = map.get(c.id) || { customerId: c.id, name, type: c.type, invoiceCount: 0, totalNet: 0 };
       existing.invoiceCount += 1;
       for (const item of inv.items) {
-        existing.totalNet += Number(item.quantity) * Number(item.unitPrice);
+        existing.totalNet += itemNet(item);
       }
       map.set(c.id, existing);
     }
@@ -158,14 +186,14 @@ const reportsRoutes: FastifyPluginAsync = async (fastify) => {
       with: { items: true },
     });
 
-    let laborNet = 0, partsNet = 0, miscNet = 0, costOfGoods = 0;
-    let laborCost = 0;
+    let laborNet = 0, partsNet = 0, miscNet = 0;
+    let costOfGoods = 0, miscCost = 0, laborCost = 0;
 
     // Classify revenue and costs directly from invoice items
     for (const inv of paidInvoices) {
       for (const item of inv.items) {
-        const net = Number(item.quantity) * Number(item.unitPrice);
-        const cost = Number(item.unitCost ?? 0) * Number(item.quantity);
+        const net = itemNet(item);
+        const cost = itemCost(item);
         if (item.type === 'labor') {
           laborNet += net;
           laborCost += cost;
@@ -174,6 +202,7 @@ const reportsRoutes: FastifyPluginAsync = async (fastify) => {
           costOfGoods += cost;
         } else {
           miscNet += net;
+          miscCost += cost;
         }
       }
     }
@@ -210,8 +239,9 @@ const reportsRoutes: FastifyPluginAsync = async (fastify) => {
       partsNet: round(partsNet),
       miscNet: round(miscNet),
       costOfGoods: round(costOfGoods),
+      miscCost: round(miscCost),
       laborCost: round(finalLaborCost),
-      grossProfit: round(laborNet + partsNet + miscNet - costOfGoods - finalLaborCost),
+      grossProfit: round(laborNet + partsNet + miscNet - costOfGoods - miscCost - finalLaborCost),
     };
   });
 

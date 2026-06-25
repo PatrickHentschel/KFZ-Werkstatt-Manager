@@ -37,6 +37,7 @@ const schema = z.object({
   bankName: z.string().max(255).optional(),
   invoicePrefix: z.string().max(20),
   awMinutes: z.number().int().min(1).max(60),
+  awRate: z.number().nonnegative(),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -51,7 +52,7 @@ export function SettingsPage() {
 
   const { register, handleSubmit, reset, watch, formState: { errors, isDirty } } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { taxRate: 19, isSmallBusiness: false, invoicePrefix: 'RE', awMinutes: 5 },
+    defaultValues: { taxRate: 19, isSmallBusiness: false, invoicePrefix: 'RE', awMinutes: 5, awRate: 95 },
   });
 
   const isSmallBusiness = watch('isSmallBusiness');
@@ -74,6 +75,7 @@ export function SettingsPage() {
         bankName: s.bankName || '',
         invoicePrefix: s.invoicePrefix,
         awMinutes: s.awMinutes ?? 5,
+        awRate: Number(s.awRate ?? 95),
       });
     }
   }, [data]);
@@ -270,6 +272,20 @@ export function SettingsPage() {
                 Standard laut REFA/VDA: 5 min/AW (= 12 AW/Std). Hersteller wie VW, Audi, BMW verwenden 5 min.
                 Einige Werkstätten nutzen 6 min (= 10 AW/Std).
               </p>
+            </div>
+            <div className="space-y-2">
+              <Label>AW-Verrechnungssatz (€/AW)</Label>
+              <div className="flex items-center gap-3">
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  className="w-28"
+                  {...register('awRate', { valueAsNumber: true })}
+                />
+                <span className="text-sm text-muted-foreground">€ pro AW</span>
+              </div>
+              {errors.awRate && <p className="text-xs text-destructive">{errors.awRate.message}</p>}
             </div>
           </CardContent>
         </Card>

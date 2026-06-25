@@ -24,6 +24,7 @@ export const tenants = pgTable('tenants', {
   cancelInvoicePrefix: varchar('cancel_invoice_prefix', { length: 20 }).notNull().default('ST'),
   cancelInvoiceCounter: integer('cancel_invoice_counter').notNull().default(0),
   awMinutes: integer('aw_minutes').notNull().default(5),
+  awRate: decimal('aw_rate', { precision: 10, scale: 2, mode: 'number' }).notNull().default(95.00),
   plan: tenantPlanEnum('plan').notNull().default('trial'),
   logoUrl: text('logo_url'),
   googleClientId: varchar('google_client_id', { length: 255 }),

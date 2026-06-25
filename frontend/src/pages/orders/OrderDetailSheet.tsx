@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { ordersApi, type TimeEntryWithStaff } from '@/api/orders.api';
+import { ordersApi, type TimeEntryWithStaff, type OrderStatus } from '@/api/orders.api';
 import { staffApi } from '@/api/staff.api';
 import { settingsApi } from '@/api/settings.api';
 import { toast } from '@/hooks/use-toast';
@@ -40,6 +40,15 @@ const statusVariant: Record<string, 'secondary' | 'default' | 'warning' | 'succe
   waiting_parts: 'warning',
   done: 'success',
   invoiced: 'outline',
+};
+
+// Spiegelt backend STATUS_TRANSITIONS. Identitäts-Übergänge sind no-op.
+const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+  open: ['in_progress', 'waiting_parts'],
+  in_progress: ['waiting_parts', 'done'],
+  waiting_parts: ['in_progress', 'done'],
+  done: ['invoiced', 'in_progress'],
+  invoiced: [],
 };
 
 function formatDuration(minutes: number): string {
@@ -131,11 +140,27 @@ export function OrderDetailSheet({ orderId, onClose }: Props) {
     },
   });
 
+  const updateStatusMutation = useMutation({
+    mutationFn: (status: OrderStatus) => ordersApi.updateStatus(orderId!, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['orders', orderId] });
+      toast({ title: 'Status aktualisiert' });
+    },
+    onError: (err: any) => {
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: err.response?.data?.message || 'Status konnte nicht geändert werden',
+      });
+    },
+  });
+
   const convertEntryMutation = useMutation({
     mutationFn: async (entry: TimeEntryWithStaff) => {
       const order = orderData!.data;
       const durationMinutes = entry.durationMinutes || 0;
-      const awRate = Number(entry.staff.awRate || 0);
+      const awRate = Number(settingsData?.data.awRate || 0);
       const hourlyRate = Number(entry.staff.hourlyRate || 0);
       const useAw = awRate > 0;
       const awMinutes = settingsData?.data.awMinutes ?? 5;
@@ -153,12 +178,14 @@ export function OrderDetailSheet({ orderId, onClose }: Props) {
         partId: item.partId || undefined,
         sortOrder: item.sortOrder,
       }));
+      const isSmallBusiness = !!settingsData?.data.isSmallBusiness;
+      const defaultTaxRate = isSmallBusiness ? 0 : Number(settingsData?.data.taxRate ?? 19);
       const newItem = {
         type: 'labor' as const,
         description: `${entry.staff.firstName} ${entry.staff.lastName}${entry.description ? ` – ${entry.description}` : ''}`,
         quantity,
         unitPrice,
-        taxRate: 20,
+        taxRate: defaultTaxRate,
         unit: useAw ? 'AW' : 'Std',
         sortOrder: currentItems.length,
       };
@@ -294,6 +321,26 @@ export function OrderDetailSheet({ orderId, onClose }: Props) {
                 {/* Overview Tab */}
                 {activeTab === 'overview' && (
                   <div className="p-5 space-y-5">
+                    {/* Status-Switcher: alle erlaubten Übergänge als Buttons */}
+                    {ALLOWED_TRANSITIONS[order.status as OrderStatus].length > 0 && (
+                      <div className="rounded-lg border p-3 flex items-center gap-2 flex-wrap">
+                        <span className="text-xs text-muted-foreground shrink-0">Status ändern:</span>
+                        {ALLOWED_TRANSITIONS[order.status as OrderStatus].map((target) => (
+                          <Button
+                            key={target}
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs"
+                            disabled={updateStatusMutation.isPending}
+                            onClick={() => updateStatusMutation.mutate(target)}
+                          >
+                            → {statusLabel[target]}
+                          </Button>
+                        ))}
+                      </div>
+                    )}
+
                     {/* Order info */}
                     <div className="rounded-lg border p-4 space-y-2 text-sm">
                       {order.description && (

@@ -37,6 +37,7 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
       bankName: z.string().max(255).optional(),
       invoicePrefix: z.string().max(20).optional(),
       awMinutes: z.number().int().min(1).max(60).optional(),
+      awRate: z.number().nonnegative().optional(),
     });
 
     const body = schema.parse(request.body);
@@ -55,6 +56,7 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
     if (body.bankName !== undefined) updates.bankName = body.bankName;
     if (body.invoicePrefix) updates.invoicePrefix = body.invoicePrefix;
     if (body.awMinutes !== undefined) updates.awMinutes = body.awMinutes;
+    if (body.awRate !== undefined) updates.awRate = body.awRate;
 
     const [updated] = await db.update(tenants)
       .set(updates)

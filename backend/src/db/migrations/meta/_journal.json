@@ -120,6 +120,41 @@
       "when": 1778544000000,
       "tag": "0016_counter_default_zero",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1778630400000,
+      "tag": "0017_invoice_number_unique",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1778716800000,
+      "tag": "0018_invoice_documents",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1778803200000,
+      "tag": "0019_skonto_rabatt_defaults",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1778889600000,
+      "tag": "0020_aw_rate_to_tenant",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1778976000000,
+      "tag": "0021_fix_invoiced_order_status",
+      "breakpoints": true
     }
   ]
 }

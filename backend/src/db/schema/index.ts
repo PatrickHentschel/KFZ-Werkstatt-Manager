@@ -4,6 +4,7 @@ export * from './customers';
 export * from './vehicles';
 export * from './orders';
 export * from './invoices';
+export * from './invoice_documents';
 export * from './appointments';
 export * from './parts';
 export * from './staff';

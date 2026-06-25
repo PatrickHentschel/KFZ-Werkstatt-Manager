@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Search, Pencil, Trash2, User, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -7,14 +8,12 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { customersApi, type Customer } from '@/api/customers.api';
 import { toast } from '@/hooks/use-toast';
-import { CustomerDialog } from './CustomerDialog';
 
 export function CustomersPage() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['customers', { page, search }],
@@ -28,16 +27,6 @@ export function CustomersPage() {
       toast({ title: 'Kunde gelöscht' });
     },
   });
-
-  const handleEdit = (customer: Customer) => {
-    setEditingCustomer(customer);
-    setDialogOpen(true);
-  };
-
-  const handleNew = () => {
-    setEditingCustomer(null);
-    setDialogOpen(true);
-  };
 
   const getDisplayName = (c: Customer) =>
     c.type === 'business' ? c.companyName : `${c.firstName || ''} ${c.lastName || ''}`.trim();
@@ -56,7 +45,7 @@ export function CustomersPage() {
             className="pl-9"
           />
         </div>
-        <Button onClick={handleNew}>
+        <Button onClick={() => navigate('/customers/new')}>
           <Plus className="mr-2 h-4 w-4" /> Neuer Kunde
         </Button>
       </div>
@@ -96,7 +85,7 @@ export function CustomersPage() {
                     <td className="px-4 py-3 text-sm text-muted-foreground">{customer.city || '—'}</td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => handleEdit(customer)}>
+                        <Button variant="ghost" size="icon" onClick={() => navigate(`/customers/${customer.id}/edit`)}>
                           <Pencil className="h-4 w-4" />
                         </Button>
                         <Button
@@ -125,12 +114,6 @@ export function CustomersPage() {
           <Button variant="outline" disabled={page === data.data.totalPages} onClick={() => setPage(p => p + 1)}>Weiter</Button>
         </div>
       )}
-
-      <CustomerDialog
-        open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
-        customer={editingCustomer}
-      />
     </div>
   );
 }

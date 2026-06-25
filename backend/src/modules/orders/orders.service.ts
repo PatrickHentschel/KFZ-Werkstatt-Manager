@@ -6,8 +6,10 @@ import { getPaginationParams, buildPaginatedResponse } from '../../utils/paginat
 
 type OrderStatus = 'open' | 'in_progress' | 'waiting_parts' | 'done' | 'invoiced';
 
+// Auch open → waiting_parts: Werkstattmeister sieht oft sofort dass Teile fehlen,
+// bevor mit der Arbeit überhaupt begonnen wurde.
 const STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  open: ['in_progress'],
+  open: ['in_progress', 'waiting_parts'],
   in_progress: ['waiting_parts', 'done'],
   waiting_parts: ['in_progress', 'done'],
   done: ['invoiced', 'in_progress'],
@@ -84,6 +86,9 @@ export class OrdersService {
     estimatedDone?: string;
     notes?: string;
     assignedStaffId?: string;
+    // Skonto: kein Pflichtfeld, Default 0 (DB-Default greift wenn weggelassen).
+    skontoPercent?: number;
+    skontoDays?: number;
   }) {
     // Generate order number
     const count = await db.select({ count: sql<number>`count(*)` }).from(orders).where(eq(orders.tenantId, tenantId));
@@ -94,6 +99,8 @@ export class OrdersService {
       tenantId,
       orderNumber,
       estimatedDone: data.estimatedDone ? new Date(data.estimatedDone) : undefined,
+      skontoPercent: data.skontoPercent ?? 0,
+      skontoDays: data.skontoDays ?? 0,
     }).returning();
     return this.getById(tenantId, order.id);
   }
@@ -125,6 +132,9 @@ export class OrdersService {
     unit?: string;
     partId?: string;
     sortOrder?: number;
+    // Rabatt: kein Pflichtfeld, Default 0.
+    discountAmount?: number;
+    discountPercent?: number;
   }>) {
     await this.getById(tenantId, orderId); // verify ownership
 
@@ -142,6 +152,8 @@ export class OrdersService {
           taxRate: item.taxRate,
           unit: item.unit || null,
           partId: item.partId,
+          discountAmount: item.discountAmount ?? 0,
+          discountPercent: item.discountPercent ?? 0,
           sortOrder: item.sortOrder ?? idx,
         }))
       );

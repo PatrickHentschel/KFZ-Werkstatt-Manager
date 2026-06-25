@@ -1,153 +1,30 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, AlertTriangle, Trash2, TrendingUp, TrendingDown, Pencil, X } from 'lucide-react';
+import { Plus, Search, AlertTriangle, Trash2, TrendingUp, TrendingDown, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import * as Dialog from '@radix-ui/react-dialog';
 import { partsApi, type Part, type Vendor } from '@/api/parts.api';
 import { toast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
-import { PartDialog } from './PartDialog';
-
-function VendorDialog({
-  open,
-  onClose,
-  initialData,
-}: {
-  open: boolean;
-  onClose: () => void;
-  initialData?: Vendor;
-}) {
-  const queryClient = useQueryClient();
-  const isEditing = !!initialData;
-  const [form, setForm] = useState({
-    name: '', email: '', phone: '', address: '', contactPerson: '', notes: '',
-  });
-
-  useEffect(() => {
-    if (open) {
-      setForm({
-        name: initialData?.name ?? '',
-        email: initialData?.email ?? '',
-        phone: initialData?.phone ?? '',
-        address: initialData?.address ?? '',
-        contactPerson: initialData?.contactPerson ?? '',
-        notes: initialData?.notes ?? '',
-      });
-    }
-  }, [open, initialData]);
-
-  const mutation = useMutation({
-    mutationFn: () =>
-      isEditing
-        ? partsApi.updateVendor(initialData!.id, form)
-        : partsApi.createVendor(form),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['vendors'] });
-      toast({ title: isEditing ? 'Lieferant aktualisiert' : 'Lieferant erstellt' });
-      onClose();
-    },
-    onError: () => toast({ variant: 'destructive', title: 'Fehler beim Speichern' }),
-  });
-
-  return (
-    <Dialog.Root open={open} onOpenChange={(o) => !o && onClose()}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-lg bg-background shadow-lg">
-          <div className="flex items-center justify-between p-6 border-b">
-            <Dialog.Title className="text-lg font-semibold">
-              {isEditing ? 'Lieferant bearbeiten' : 'Neuer Lieferant'}
-            </Dialog.Title>
-            <Dialog.Close asChild>
-              <Button variant="ghost" size="icon"><X className="h-4 w-4" /></Button>
-            </Dialog.Close>
-          </div>
-          <div className="p-6 space-y-4">
-            <div className="space-y-1">
-              <Label>Name *</Label>
-              <Input
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="Lieferant GmbH"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <Label>E-Mail</Label>
-                <Input
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                  placeholder="info@lieferant.de"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label>Telefon</Label>
-                <Input
-                  value={form.phone}
-                  onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                  placeholder="+49 30 1234567"
-                />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <Label>Ansprechpartner</Label>
-              <Input
-                value={form.contactPerson}
-                onChange={(e) => setForm((f) => ({ ...f, contactPerson: e.target.value }))}
-                placeholder="Max Mustermann"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>Adresse</Label>
-              <Input
-                value={form.address}
-                onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
-                placeholder="Musterstraße 1, Berlin"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>Notizen</Label>
-              <Input
-                value={form.notes}
-                onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                placeholder="Optionale Notizen"
-              />
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={onClose}>Abbrechen</Button>
-              <Button
-                onClick={() => mutation.mutate()}
-                disabled={mutation.isPending || !form.name.trim()}
-              >
-                {mutation.isPending ? 'Wird gespeichert...' : 'Speichern'}
-              </Button>
-            </div>
-          </div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
-  );
-}
 
 export function PartsPage() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<'parts' | 'vendors'>('parts');
+
+  // Tab über URL-Parameter, damit Rück-Navigation aus VendorFormPage den Tab erhält
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab: 'parts' | 'vendors' = searchParams.get('tab') === 'vendors' ? 'vendors' : 'parts';
+  const setTab = (next: 'parts' | 'vendors') => {
+    setSearchParams(next === 'parts' ? {} : { tab: 'vendors' });
+  };
 
   // Parts state
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [showLowStock, setShowLowStock] = useState(false);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editPart, setEditPart] = useState<Part | undefined>(undefined);
-
-  // Vendors state
-  const [vendorDialogOpen, setVendorDialogOpen] = useState(false);
-  const [editVendor, setEditVendor] = useState<Vendor | undefined>(undefined);
 
   const { data, isLoading } = useQuery({
     queryKey: ['parts', { page, search, lowStock: showLowStock }],
@@ -231,7 +108,7 @@ export function PartsPage() {
               <AlertTriangle className="h-4 w-4" />
               Mindestbestand
             </Button>
-            <Button onClick={() => { setEditPart(undefined); setDialogOpen(true); }}>
+            <Button onClick={() => navigate('/parts/new')}>
               <Plus className="mr-2 h-4 w-4" /> Neues Teil
             </Button>
           </div>
@@ -291,7 +168,7 @@ export function PartsPage() {
                           </td>
                           <td className="px-4 py-3 text-right">
                             <Button variant="ghost" size="icon"
-                              onClick={() => { setEditPart(part); setDialogOpen(true); }}>
+                              onClick={() => navigate(`/parts/${part.id}/edit`)}>
                               <Pencil className="h-4 w-4" />
                             </Button>
                             <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"
@@ -322,7 +199,7 @@ export function PartsPage() {
       {tab === 'vendors' && (
         <>
           <div className="flex justify-end">
-            <Button onClick={() => { setEditVendor(undefined); setVendorDialogOpen(true); }}>
+            <Button onClick={() => navigate('/parts/vendors/new')}>
               <Plus className="mr-2 h-4 w-4" /> Neuer Lieferant
             </Button>
           </div>
@@ -353,7 +230,7 @@ export function PartsPage() {
                         <td className="px-4 py-3 text-sm">{vendor.phone || '—'}</td>
                         <td className="px-4 py-3 text-right">
                           <Button variant="ghost" size="icon"
-                            onClick={() => { setEditVendor(vendor); setVendorDialogOpen(true); }}>
+                            onClick={() => navigate(`/parts/vendors/${vendor.id}/edit`)}>
                             <Pencil className="h-4 w-4" />
                           </Button>
                           <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"
@@ -370,18 +247,6 @@ export function PartsPage() {
           </Card>
         </>
       )}
-
-      <PartDialog
-        open={dialogOpen}
-        onClose={() => { setDialogOpen(false); setEditPart(undefined); }}
-        initialData={editPart}
-      />
-
-      <VendorDialog
-        open={vendorDialogOpen}
-        onClose={() => { setVendorDialogOpen(false); setEditVendor(undefined); }}
-        initialData={editVendor}
-      />
     </div>
   );
 }

@@ -9,7 +9,6 @@ const createStaffSchema = z.object({
   phone: z.string().optional(),
   role: z.string().default('Techniker'),
   hourlyRate: z.number().nonnegative().optional(),
-  awRate: z.number().nonnegative().optional(),
   costRate: z.number().nonnegative().optional(),
   color: z.string().optional(),
 });

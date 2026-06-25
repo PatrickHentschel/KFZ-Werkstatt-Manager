@@ -10,7 +10,6 @@ import { invoicesApi, type Invoice, type InvoiceStatus } from '@/api/invoices.ap
 import { paymentsApi } from '@/api/payments.api';
 import { toast } from '@/hooks/use-toast';
 import { formatDate } from '@/lib/locale';
-import { InvoiceDialog } from './InvoiceDialog';
 import { PreviewDialog } from './PreviewDialog';
 
 const statusLabel: Record<string, string> = { draft: 'Entwurf', sent: 'Offen', paid: 'Bezahlt', cancelled: 'Storniert' };
@@ -48,8 +47,6 @@ export function InvoicesPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | InvoiceStatus>('all');
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editInvoice, setEditInvoice] = useState<Invoice | null>(null);
   const [checkingOutId, setCheckingOutId] = useState<string | null>(null);
   const [previewIntent, setPreviewIntent] = useState<PreviewIntent | null>(null);
 
@@ -82,7 +79,6 @@ export function InvoicesPage() {
         pageSize: 20,
         search: search || undefined,
         status: activeTab !== 'all' ? activeTab : undefined,
-        statuses: activeTab === 'all' ? 'sent,paid,cancelled' : undefined,
       }),
   });
 
@@ -170,7 +166,7 @@ export function InvoicesPage() {
             className="pl-9"
           />
         </div>
-        <Button onClick={() => setDialogOpen(true)}>
+        <Button onClick={() => navigate('/invoices/new')}>
           <Plus className="mr-2 h-4 w-4" /> Neue Rechnung
         </Button>
       </div>
@@ -214,7 +210,7 @@ export function InvoicesPage() {
                             variant="outline"
                             size="icon"
                             title="Bearbeiten"
-                            onClick={() => setEditInvoice(inv)}
+                            onClick={() => navigate(`/invoices/${inv.id}/edit`)}
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
@@ -291,12 +287,6 @@ export function InvoicesPage() {
           )}
         </CardContent>
       </Card>
-
-      <InvoiceDialog
-        open={dialogOpen || !!editInvoice}
-        onClose={() => { setDialogOpen(false); setEditInvoice(null); }}
-        invoice={editInvoice ?? undefined}
-      />
 
       <PreviewDialog
         open={!!previewIntent}

@@ -1,13 +1,13 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ordersApi, type Order, type OrderStatus } from '@/api/orders.api';
 import { toast } from '@/hooks/use-toast';
-import { OrderDialog } from './OrderDialog';
 import { OrderDetailSheet } from './OrderDetailSheet';
 
 const statusLabel: Record<string, string> = {
@@ -31,7 +31,7 @@ const nextStatus: Record<OrderStatus, OrderStatus | null> = {
   open: 'in_progress',
   in_progress: 'done',
   waiting_parts: 'in_progress',
-  done: 'invoiced',
+  done: null,
   invoiced: null,
 };
 
@@ -52,11 +52,11 @@ const tabs: { label: string; value: 'all' | OrderStatus }[] = [
 ];
 
 export function OrdersPage() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | OrderStatus>('all');
-  const [dialogOpen, setDialogOpen] = useState(false);
   const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
@@ -71,10 +71,10 @@ export function OrdersPage() {
 
   const createInvoiceMutation = useMutation({
     mutationFn: (id: string) => ordersApi.createInvoice(id),
-    onSuccess: () => {
+    onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
-      toast({ title: 'Rechnung erstellt' });
+      navigate(`/invoices/${res.data.id}/edit`);
     },
     onError: (err: any) => {
       toast({
@@ -134,7 +134,7 @@ export function OrdersPage() {
             className="pl-9"
           />
         </div>
-        <Button onClick={() => setDialogOpen(true)}>
+        <Button onClick={() => navigate('/orders/new')}>
           <Plus className="mr-2 h-4 w-4" /> Neuer Auftrag
         </Button>
       </div>
@@ -188,6 +188,14 @@ export function OrdersPage() {
                         className="px-4 py-3 text-right space-x-2"
                         onClick={(e) => e.stopPropagation()}
                       >
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => navigate(`/orders/${o.id}/edit`)}
+                          title="Bearbeiten"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
                         {o.status === 'done' && (
                           <Button
                             variant="default"
@@ -230,7 +238,6 @@ export function OrdersPage() {
         </div>
       )}
 
-      <OrderDialog open={dialogOpen} onClose={() => setDialogOpen(false)} />
       <OrderDetailSheet orderId={detailOrderId} onClose={() => setDetailOrderId(null)} />
     </div>
   );

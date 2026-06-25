@@ -11,6 +11,9 @@ const createOrderSchema = z.object({
   estimatedDone: z.string().optional(),
   notes: z.string().optional(),
   assignedStaffId: z.string().uuid().optional(),
+  // Skonto: kein Pflichtfeld, Default 0.
+  skontoPercent: z.number().nonnegative().max(100).optional(),
+  skontoDays: z.number().int().nonnegative().optional(),
 });
 
 const orderItemSchema = z.object({
@@ -22,6 +25,9 @@ const orderItemSchema = z.object({
   unit: z.string().max(10).optional(),
   partId: z.string().uuid().optional(),
   sortOrder: z.number().int().optional(),
+  // Rabatt: kein Pflichtfeld, Default 0.
+  discountAmount: z.number().nonnegative().optional(),
+  discountPercent: z.number().nonnegative().max(100).optional(),
 });
 
 const ordersRoutes: FastifyPluginAsync = async (fastify) => {
@@ -89,6 +95,7 @@ const ordersRoutes: FastifyPluginAsync = async (fastify) => {
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const invoice = await invoicesService.createFromOrder(request.user.tenantId, id);
+    await ordersService.updateStatus(request.user.tenantId, id, 'invoiced');
     return reply.code(201).send(invoice);
   });
 };

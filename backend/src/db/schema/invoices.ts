@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, decimal, text, timestamp, pgEnum, date, integer } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, decimal, text, timestamp, pgEnum, date, integer, uniqueIndex } from 'drizzle-orm/pg-core';
 import { tenants } from './tenants';
 import { customers } from './customers';
 import { orders, orderItemTypeEnum } from './orders';
@@ -18,9 +18,10 @@ export const invoices = pgTable('invoices', {
   serviceDate: date('service_date'),
   dueDate: date('due_date'),
   paidAt: timestamp('paid_at'),
-  // Skonto: Zahlungsabzug bei Zahlung innerhalb skontoDays Tagen
-  skontoPercent: decimal('skonto_percent', { precision: 5, scale: 2, mode: 'number' }),
-  skontoDays: integer('skonto_days'),
+  // Skonto: Zahlungsabzug bei Zahlung innerhalb skontoDays Tagen.
+  // Default 0 — bei 0 wird nichts auf den Beleg geschrieben.
+  skontoPercent: decimal('skonto_percent', { precision: 5, scale: 2, mode: 'number' }).notNull().default(0),
+  skontoDays: integer('skonto_days').notNull().default(0),
   stripePaymentIntentId: varchar('stripe_payment_intent_id', { length: 255 }),
   stripeCheckoutSessionId: varchar('stripe_checkout_session_id', { length: 255 }),
   paymentMethod: varchar('payment_method', { length: 50 }),
@@ -30,7 +31,10 @@ export const invoices = pgTable('invoices', {
   cancelsInvoiceId: uuid('cancels_invoice_id'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
+}, (t) => ({
+  // §14 UStG: Rechnungsnummer pro Tenant garantiert eindeutig.
+  tenantNumberUnique: uniqueIndex('invoices_tenant_number_unique').on(t.tenantId, t.invoiceNumber),
+}));
 
 export const invoiceItems = pgTable('invoice_items', {
   id: uuid('id').defaultRandom().primaryKey(),

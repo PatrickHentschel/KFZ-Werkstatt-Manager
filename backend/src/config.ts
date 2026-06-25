@@ -40,6 +40,9 @@ export const config = {
   stripeSecretKey:      optionalSecret('STRIPE_SECRET_KEY', 'stripe_secret_key'),
   stripeWebhookSecret:  optionalSecret('STRIPE_WEBHOOK_SECRET', 'stripe_webhook_secret'),
   stripePublishableKey: optionalSecret('STRIPE_PUBLISHABLE_KEY', 'stripe_publishable_key'),
+  // §147 AO: Belegarchiv. Muss auf einem persistenten Volume liegen,
+  // NICHT auf Container-FS. docker-compose mountet pdfs_data → /app/pdfs.
+  invoiceStoragePath:   process.env.INVOICE_STORAGE_PATH || '/app/pdfs',
 };
 
 export const isStripeEnabled = (): boolean => !!config.stripeSecretKey;

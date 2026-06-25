@@ -237,6 +237,3 @@ Multi-tenant workshop management app for automotive repair shops. Manages custom
 
 ## Cross-Cutting Concerns
 
-<!-- GSD:architecture-end -->
-
-<!-- GSD:skills-start source:skills/ -->

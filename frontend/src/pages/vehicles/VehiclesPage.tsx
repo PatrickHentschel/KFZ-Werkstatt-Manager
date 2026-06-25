@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Search, Trash2, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -7,7 +8,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { vehiclesApi, type Vehicle } from '@/api/vehicles.api';
 import { toast } from '@/hooks/use-toast';
 import { formatNumber } from '@/lib/locale';
-import { VehicleDialog } from './VehicleDialog';
 
 function customerName(c: Vehicle['customer']): string {
   if (!c) return '—';
@@ -15,11 +15,10 @@ function customerName(c: Vehicle['customer']): string {
 }
 
 export function VehiclesPage() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editVehicle, setEditVehicle] = useState<Vehicle | undefined>(undefined);
 
   const { data, isLoading } = useQuery({
     queryKey: ['vehicles', { page, search }],
@@ -33,21 +32,6 @@ export function VehiclesPage() {
       toast({ title: 'Fahrzeug gelöscht' });
     },
   });
-
-  function openCreate() {
-    setEditVehicle(undefined);
-    setDialogOpen(true);
-  }
-
-  function openEdit(vehicle: Vehicle) {
-    setEditVehicle(vehicle);
-    setDialogOpen(true);
-  }
-
-  function handleDialogClose() {
-    setDialogOpen(false);
-    setEditVehicle(undefined);
-  }
 
   return (
     <div className="space-y-6">
@@ -63,7 +47,7 @@ export function VehiclesPage() {
             className="pl-9"
           />
         </div>
-        <Button onClick={openCreate}>
+        <Button onClick={() => navigate('/vehicles/new')}>
           <Plus className="mr-2 h-4 w-4" /> Neues Fahrzeug
         </Button>
       </div>
@@ -100,7 +84,7 @@ export function VehiclesPage() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => openEdit(v)}
+                        onClick={() => navigate(`/vehicles/${v.id}/edit`)}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -122,12 +106,6 @@ export function VehiclesPage() {
           )}
         </CardContent>
       </Card>
-
-      <VehicleDialog
-        open={dialogOpen}
-        onClose={handleDialogClose}
-        initialData={editVehicle}
-      />
     </div>
   );
 }

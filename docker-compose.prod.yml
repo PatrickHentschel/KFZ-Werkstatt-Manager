@@ -41,6 +41,7 @@ services:
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_FROM: ${SMTP_FROM:-}
+      INVOICE_STORAGE_PATH: /app/pdfs
     secrets:
       - jwt_access_secret
       - jwt_refresh_secret

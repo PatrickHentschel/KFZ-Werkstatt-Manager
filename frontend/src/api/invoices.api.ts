@@ -32,8 +32,9 @@ export interface Invoice {
   serviceDate?: string | null;
   dueDate?: string;
   paidAt?: string;
-  skontoPercent?: number | null;
-  skontoDays?: number | null;
+  // Default 0 — bei 0 nicht auf den Beleg gedruckt.
+  skontoPercent: number;
+  skontoDays: number;
   cancelsInvoiceId?: string | null;
   cancelsInvoice?: { invoiceNumber: string; issueDate: string | null } | null;
   items: InvoiceItem[];
@@ -52,8 +53,8 @@ export interface DraftInvoicePayload {
   serviceDate?: string | null;
   dueDate?: string;
   notes?: string;
-  skontoPercent?: number | null;
-  skontoDays?: number | null;
+  skontoPercent?: number;
+  skontoDays?: number;
   items?: Array<{
     type?: 'labor' | 'part' | 'misc';
     description?: string;
@@ -81,6 +82,7 @@ export const invoicesApi = {
     apiClient.patch<Invoice>(`/invoices/${id}/status`, { status }),
   cancel: (id: string) => apiClient.post<Invoice>(`/invoices/${id}/cancel`),
   getPdf: (id: string) => apiClient.get(`/invoices/${id}/pdf`, { responseType: 'blob' }),
+  getXRechnung: (id: string) => apiClient.get(`/invoices/${id}/xrechnung`, { responseType: 'blob' }),
   send: (id: string) => apiClient.post(`/invoices/${id}/send`),
   createDraft: (data: DraftInvoicePayload) => apiClient.post<Invoice>('/invoices/draft', data),
   updateDraft: (id: string, data: DraftInvoicePayload) => apiClient.patch<Invoice>(`/invoices/draft/${id}`, data),

@@ -5,6 +5,7 @@ import { customers } from './customers';
 import { vehicles } from './vehicles';
 import { orders, orderItems } from './orders';
 import { invoices, invoiceItems } from './invoices';
+import { invoiceDocuments } from './invoice_documents';
 import { appointments } from './appointments';
 import { parts, vendors } from './parts';
 import { staff, timeEntries } from './staff';
@@ -62,6 +63,7 @@ export const invoicesRelations = relations(invoices, ({ one, many }) => ({
   customer: one(customers, { fields: [invoices.customerId], references: [customers.id] }),
   order: one(orders, { fields: [invoices.orderId], references: [orders.id] }),
   items: many(invoiceItems),
+  documents: many(invoiceDocuments),
   // Self-relation: Stornorechnung → Original
   cancelsInvoice: one(invoices, {
     fields: [invoices.cancelsInvoiceId],
@@ -72,6 +74,11 @@ export const invoicesRelations = relations(invoices, ({ one, many }) => ({
 
 export const invoiceItemsRelations = relations(invoiceItems, ({ one }) => ({
   invoice: one(invoices, { fields: [invoiceItems.invoiceId], references: [invoices.id] }),
+}));
+
+export const invoiceDocumentsRelations = relations(invoiceDocuments, ({ one }) => ({
+  tenant: one(tenants, { fields: [invoiceDocuments.tenantId], references: [tenants.id] }),
+  invoice: one(invoices, { fields: [invoiceDocuments.invoiceId], references: [invoices.id] }),
 }));
 
 export const appointmentsRelations = relations(appointments, ({ one }) => ({

@@ -45,6 +45,7 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
       GOOGLE_REDIRECT_URI: http://localhost:3009/api/v1/appointments/auth/google/callback
+      INVOICE_STORAGE_PATH: /app/pdfs
     ports:
       - "3009:3000"
     volumes:
