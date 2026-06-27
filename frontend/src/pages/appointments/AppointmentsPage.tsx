@@ -139,7 +139,7 @@ export function AppointmentsPage() {
         <Card className="max-w-lg">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-blue-500" />
+              <Calendar className="h-5 w-5 text-primary" />
               Kalender auswählen
             </CardTitle>
             <CardDescription>
@@ -184,7 +184,7 @@ export function AppointmentsPage() {
         <Card className="max-w-lg">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-blue-500" />
+              <Calendar className="h-5 w-5 text-primary" />
               Google Calendar verbinden
             </CardTitle>
             <CardDescription>
@@ -194,13 +194,13 @@ export function AppointmentsPage() {
           <CardContent className="space-y-4">
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li className="flex items-center gap-2">
-                <span className="text-green-500">✓</span> Termine erstellen, bearbeiten und löschen
+                <span className="text-success">✓</span> Termine erstellen, bearbeiten und löschen
               </li>
               <li className="flex items-center gap-2">
-                <span className="text-green-500">✓</span> Synchronisierung mit Google Kalender auf allen Geräten
+                <span className="text-success">✓</span> Synchronisierung mit Google Kalender auf allen Geräten
               </li>
               <li className="flex items-center gap-2">
-                <span className="text-green-500">✓</span> Farbcodierung nach Mitarbeiter oder Priorität
+                <span className="text-success">✓</span> Farbcodierung nach Mitarbeiter oder Priorität
               </li>
             </ul>
             <Button onClick={handleConnect} className="w-full">
@@ -254,7 +254,7 @@ export function AppointmentsPage() {
         <div className="flex items-center gap-3">
           <h1 className="text-3xl font-bold">Termine</h1>
           <Badge variant="outline" className="flex items-center gap-1">
-            <span className="h-2 w-2 rounded-full bg-green-500 inline-block" />
+            <span className="h-2 w-2 rounded-full bg-success inline-block" />
             Google Calendar
           </Badge>
         </div>

@@ -4,9 +4,11 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Search } from 'lucide-react';
+import { Search, CheckCircle2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Select } from '@/components/ui/select';
 import { vehiclesApi } from '@/api/vehicles.api';
 import { customersApi, type Customer } from '@/api/customers.api';
 import { toast } from '@/hooks/use-toast';
@@ -20,17 +22,17 @@ const nanToUndefined = (v: unknown) => (typeof v === 'number' && isNaN(v) ? unde
 
 const schema = z.object({
   customerId: z.string().min(1, 'Bitte einen Kunden auswählen'),
-  licensePlate: z.string().min(1, 'Pflichtfeld'),
-  make: z.string().min(1, 'Pflichtfeld'),
-  model: z.string().min(1, 'Pflichtfeld'),
-  vin: z.string().optional().refine((v) => !v || v.length === 17, 'FIN muss 17 Zeichen haben'),
-  hsn: z.string().optional().refine((v) => !v || HSN_RE.test(v), 'HSN: 4 Ziffern'),
-  tsn: z.string().optional().refine((v) => !v || TSN_RE.test(v.toUpperCase()), 'TSN: 3 alphanumerisch'),
+  licensePlate: z.string().min(1, 'Kennzeichen ist erforderlich (z.B. B-AB 1234)'),
+  make: z.string().min(1, 'Marke ist erforderlich (z.B. VW, BMW)'),
+  model: z.string().min(1, 'Modell ist erforderlich (z.B. Golf, 3er)'),
+  vin: z.string().optional().refine((v) => !v || v.length === 17, 'FIN muss genau 17 Zeichen haben'),
+  hsn: z.string().optional().refine((v) => !v || HSN_RE.test(v), 'HSN: genau 4 Ziffern (z.B. 0603)'),
+  tsn: z.string().optional().refine((v) => !v || TSN_RE.test(v.toUpperCase()), 'TSN: 3 Zeichen (Ziffern/Buchstaben, z.B. AUC)'),
   firstRegistration: z.string().optional(),
   color: z.string().optional(),
   fuelType: z.string().optional(),
   transmission: z.string().optional(),
-  mileage: z.preprocess(nanToUndefined, z.number({ required_error: 'Pflichtfeld' }).int().nonnegative()),
+  mileage: z.preprocess(nanToUndefined, z.number({ required_error: 'Kilometerstand ist erforderlich', invalid_type_error: 'Bitte eine gültige Zahl eingeben' }).int('Nur ganze Zahlen').nonnegative('Kilometerstand kann nicht negativ sein')),
   nextTuvDate: z.string().optional(),
   notes: z.string().optional(),
 });
@@ -41,6 +43,39 @@ function getCustomerName(c: Customer): string {
   return c.type === 'business'
     ? c.companyName || '—'
     : `${c.firstName || ''} ${c.lastName || ''}`.trim() || '—';
+}
+
+function VehicleFormSkeleton() {
+  return (
+    <div className="space-y-6 animate-pulse" aria-hidden>
+      {/* Kunde */}
+      <div className="rounded-lg border bg-card p-6 space-y-4">
+        <div className="h-5 w-20 rounded bg-muted" />
+        <div className="h-10 w-full rounded-md bg-muted" />
+        <div className="space-y-1">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-9 w-full rounded bg-muted" />
+          ))}
+        </div>
+      </div>
+      {/* Stammdaten */}
+      <div className="rounded-lg border bg-card p-6 space-y-4">
+        <div className="h-5 w-28 rounded bg-muted" />
+        <div className="grid grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => <div key={i} className="h-10 rounded-md bg-muted" />)}
+        </div>
+      </div>
+      {/* Identifikation + Stand */}
+      {[1, 2].map((i) => (
+        <div key={i} className="rounded-lg border bg-card p-6 space-y-4">
+          <div className="h-5 w-32 rounded bg-muted" />
+          <div className="grid grid-cols-3 gap-4">
+            {[1, 2, 3].map((j) => <div key={j} className="h-10 rounded-md bg-muted" />)}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export function VehicleFormPage() {
@@ -66,6 +101,7 @@ export function VehicleFormPage() {
   } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: { customerId: '' },
+    mode: 'onTouched',
   });
 
   const selectedCustomerId = watch('customerId');
@@ -96,6 +132,19 @@ export function VehicleFormPage() {
     queryFn: () => customersApi.list({ pageSize: 50, search: customerSearch || undefined }),
   });
 
+  const submitHandler = handleSubmit((d) => mutation.mutate(d));
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        submitHandler();
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [submitHandler]);
+
   const mutation = useMutation({
     mutationFn: (data: FormData) => {
       const payload = {
@@ -108,9 +157,7 @@ export function VehicleFormPage() {
         transmission: data.transmission || undefined,
         nextTuvDate: data.nextTuvDate || undefined,
       };
-      return isEdit
-        ? vehiclesApi.update(id!, payload)
-        : vehiclesApi.create(payload);
+      return isEdit ? vehiclesApi.update(id!, payload) : vehiclesApi.create(payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vehicles'] });
@@ -131,7 +178,17 @@ export function VehicleFormPage() {
   const selectedCustomer = customers.find((c) => c.id === selectedCustomerId);
 
   if (isEdit && isLoadingExisting) {
-    return <div className="text-muted-foreground">Wird geladen...</div>;
+    return (
+      <div className="flex flex-col min-h-[calc(100vh-7rem)]">
+        <div className="flex items-center gap-3 pb-4 border-b mb-6">
+          <div className="h-9 w-9 rounded bg-muted animate-pulse" />
+          <div className="h-7 w-56 rounded bg-muted animate-pulse" />
+        </div>
+        <div className="flex-1 mx-auto w-full max-w-4xl">
+          <VehicleFormSkeleton />
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -139,7 +196,7 @@ export function VehicleFormPage() {
       title={isEdit ? 'Fahrzeug bearbeiten' : 'Neues Fahrzeug'}
       subtitle={isEdit && existing ? `${existing.licensePlate} · ${existing.make} ${existing.model}` : undefined}
       onCancel={() => navigate('/vehicles')}
-      onSubmit={handleSubmit((d) => mutation.mutate(d))}
+      onSubmit={submitHandler}
       isDirty={isDirty}
       isSubmitting={mutation.isPending}
     >
@@ -155,15 +212,21 @@ export function VehicleFormPage() {
           </div>
         )}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden />
           <Input
+            id="customer-search"
+            aria-label="Kunden suchen"
             placeholder="Kunden suchen..."
             value={customerSearch}
             onChange={(e) => setCustomerSearch(e.target.value)}
             className="pl-9"
           />
         </div>
-        <div className="space-y-1 max-h-96 overflow-y-auto rounded-md border">
+        <div
+          role="group"
+          aria-label="Kundenliste"
+          className="space-y-1 max-h-96 overflow-y-auto rounded-md border"
+        >
           {customers.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">Keine Kunden gefunden</p>
           ) : (
@@ -171,6 +234,7 @@ export function VehicleFormPage() {
               <button
                 key={c.id}
                 type="button"
+                aria-pressed={selectedCustomerId === c.id}
                 className={cn(
                   'w-full text-left px-3 py-2 hover:bg-muted/50 transition-colors text-sm border-b last:border-b-0',
                   selectedCustomerId === c.id && 'bg-primary/5 text-primary font-medium',
@@ -189,25 +253,58 @@ export function VehicleFormPage() {
             ))
           )}
         </div>
-        {errors.customerId && <p className="text-xs text-destructive">{errors.customerId.message}</p>}
+        {errors.customerId && (
+          <p className="text-xs text-destructive" role="alert">{errors.customerId.message}</p>
+        )}
       </FormSection>
 
       <FormSection title="Stammdaten">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <div className="space-y-2">
-            <Label>Kennzeichen <span className="text-destructive">*</span></Label>
-            <Input placeholder="B-AB 1234" className="font-mono uppercase" {...register('licensePlate')} />
-            {errors.licensePlate && <p className="text-xs text-destructive">{errors.licensePlate.message}</p>}
+            <Label htmlFor="vehicle-license-plate">
+              Kennzeichen <span className="text-destructive" aria-hidden>*</span>
+            </Label>
+            <Input
+              id="vehicle-license-plate"
+              placeholder="B-AB 1234"
+              className="font-mono uppercase"
+              aria-required="true"
+              aria-invalid={!!errors.licensePlate}
+              {...register('licensePlate')}
+            />
+            {errors.licensePlate && (
+              <p className="text-xs text-destructive" role="alert">{errors.licensePlate.message}</p>
+            )}
           </div>
           <div className="space-y-2">
-            <Label>Marke <span className="text-destructive">*</span></Label>
-            <Input placeholder="VW" {...register('make')} />
-            {errors.make && <p className="text-xs text-destructive">{errors.make.message}</p>}
+            <Label htmlFor="vehicle-make">
+              Marke <span className="text-destructive" aria-hidden>*</span>
+            </Label>
+            <Input
+              id="vehicle-make"
+              placeholder="VW"
+              aria-required="true"
+              aria-invalid={!!errors.make}
+              {...register('make')}
+            />
+            {errors.make && (
+              <p className="text-xs text-destructive" role="alert">{errors.make.message}</p>
+            )}
           </div>
           <div className="space-y-2">
-            <Label>Modell <span className="text-destructive">*</span></Label>
-            <Input placeholder="Golf" {...register('model')} />
-            {errors.model && <p className="text-xs text-destructive">{errors.model.message}</p>}
+            <Label htmlFor="vehicle-model">
+              Modell <span className="text-destructive" aria-hidden>*</span>
+            </Label>
+            <Input
+              id="vehicle-model"
+              placeholder="Golf"
+              aria-required="true"
+              aria-invalid={!!errors.model}
+              {...register('model')}
+            />
+            {errors.model && (
+              <p className="text-xs text-destructive" role="alert">{errors.model.message}</p>
+            )}
           </div>
         </div>
       </FormSection>
@@ -218,70 +315,106 @@ export function VehicleFormPage() {
       >
         <div className="grid grid-cols-1 gap-4 md:grid-cols-[100px_100px_1fr]">
           <div className="space-y-2">
-            <Label>HSN</Label>
-            <Input placeholder="0603" maxLength={4} {...register('hsn')} />
-            {errors.hsn && <p className="text-xs text-destructive">{errors.hsn.message}</p>}
+            <Label htmlFor="vehicle-hsn">HSN</Label>
+            <Input
+              id="vehicle-hsn"
+              placeholder="0603"
+              maxLength={4}
+              aria-invalid={!!errors.hsn}
+              {...register('hsn')}
+            />
+            {errors.hsn && (
+              <p className="text-xs text-destructive" role="alert">{errors.hsn.message}</p>
+            )}
           </div>
           <div className="space-y-2">
-            <Label>TSN</Label>
-            <Input placeholder="AUC" maxLength={3} className="uppercase" {...register('tsn')} />
-            {errors.tsn && <p className="text-xs text-destructive">{errors.tsn.message}</p>}
+            <Label htmlFor="vehicle-tsn">TSN</Label>
+            <Input
+              id="vehicle-tsn"
+              placeholder="AUC"
+              maxLength={3}
+              className="uppercase"
+              aria-invalid={!!errors.tsn}
+              {...register('tsn')}
+            />
+            {errors.tsn && (
+              <p className="text-xs text-destructive" role="alert">{errors.tsn.message}</p>
+            )}
           </div>
           <div className="space-y-2">
-            <Label>FIN / VIN</Label>
+            <Label htmlFor="vehicle-vin">FIN / VIN</Label>
             <div className="relative">
               <Input
+                id="vehicle-vin"
                 placeholder="WVWZZZ1KZAW123456"
                 className="font-mono uppercase pr-14"
                 maxLength={17}
+                aria-invalid={!!errors.vin}
+                aria-describedby={vinValue.length > 0 ? 'vin-counter' : undefined}
                 {...register('vin')}
               />
-              {vinValue.length > 0 && vinValue.length < 17 && (
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground tabular-nums pointer-events-none">
+              {vinValue.length === 17 ? (
+                <CheckCircle2
+                  id="vin-counter"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-success pointer-events-none"
+                  aria-label="FIN vollständig"
+                />
+              ) : vinValue.length > 0 ? (
+                <span
+                  id="vin-counter"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground tabular-nums pointer-events-none"
+                  aria-live="polite"
+                >
                   {vinValue.length}/17
                 </span>
-              )}
+              ) : null}
             </div>
-            {errors.vin && <p className="text-xs text-destructive">{errors.vin.message}</p>}
+            {errors.vin && (
+              <p className="text-xs text-destructive" role="alert">{errors.vin.message}</p>
+            )}
           </div>
         </div>
       </FormSection>
 
-      <FormSection title="Stand & HU">
+      <FormSection title="Kilometerstand & Prüfung">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <div className="space-y-2">
-            <Label>Kilometerstand <span className="text-destructive">*</span></Label>
+            <Label htmlFor="vehicle-mileage">
+              Kilometerstand <span className="text-destructive" aria-hidden>*</span>
+            </Label>
             <Input
+              id="vehicle-mileage"
               type="number"
               placeholder="125000"
               min={0}
+              aria-required="true"
+              aria-invalid={!!errors.mileage}
               {...register('mileage', { valueAsNumber: true })}
             />
-            {errors.mileage && <p className="text-xs text-destructive">{errors.mileage.message}</p>}
+            {errors.mileage && (
+              <p className="text-xs text-destructive" role="alert">{errors.mileage.message}</p>
+            )}
           </div>
           <div className="space-y-2">
-            <Label>Erstzulassung</Label>
-            <Input type="date" {...register('firstRegistration')} />
+            <Label htmlFor="vehicle-first-registration">Erstzulassung</Label>
+            <Input id="vehicle-first-registration" type="date" {...register('firstRegistration')} />
           </div>
           <div className="space-y-2">
-            <Label>Nächste HU / AU</Label>
-            <Input type="date" {...register('nextTuvDate')} />
+            <Label htmlFor="vehicle-next-tuv">Nächste HU / AU</Label>
+            <Input id="vehicle-next-tuv" type="date" {...register('nextTuvDate')} />
           </div>
         </div>
       </FormSection>
 
-      <FormSection title="Sonstiges">
+      <FormSection title="Ausstattung">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <div className="space-y-2">
-            <Label>Farbe</Label>
-            <Input placeholder="Silber" {...register('color')} />
+            <Label htmlFor="vehicle-color">Farbe</Label>
+            <Input id="vehicle-color" placeholder="Silber" {...register('color')} />
           </div>
           <div className="space-y-2">
-            <Label>Kraftstoff</Label>
-            <select
-              {...register('fuelType')}
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            >
+            <Label htmlFor="vehicle-fuel-type">Kraftstoff</Label>
+            <Select id="vehicle-fuel-type" {...register('fuelType')}>
               <option value="">— bitte wählen —</option>
               <option value="benzin">Benzin</option>
               <option value="diesel">Diesel</option>
@@ -290,24 +423,26 @@ export function VehicleFormPage() {
               <option value="lpg">LPG / Autogas</option>
               <option value="cng">CNG / Erdgas</option>
               <option value="sonstige">Sonstige</option>
-            </select>
+            </Select>
           </div>
           <div className="space-y-2">
-            <Label>Getriebe</Label>
-            <select
-              {...register('transmission')}
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            >
+            <Label htmlFor="vehicle-transmission">Getriebe</Label>
+            <Select id="vehicle-transmission" {...register('transmission')}>
               <option value="">— bitte wählen —</option>
               <option value="manual">Schaltgetriebe</option>
               <option value="automatic">Automatik</option>
               <option value="semi_automatic">Halbautomatik / DSG</option>
-            </select>
+            </Select>
           </div>
         </div>
         <div className="space-y-2">
-          <Label>Notizen</Label>
-          <Input placeholder="Interne Notizen..." {...register('notes')} />
+          <Label htmlFor="vehicle-notes">Notizen</Label>
+          <Textarea
+            id="vehicle-notes"
+            placeholder="Reifengröße, Besonderheiten, Kundenhinweise …"
+            rows={3}
+            {...register('notes')}
+          />
         </div>
       </FormSection>
     </ResourceFormLayout>

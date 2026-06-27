@@ -6,12 +6,12 @@ import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { partsApi } from '@/api/parts.api';
 import { toast } from '@/hooks/use-toast';
 import { ResourceFormLayout, FormSection } from '@/components/shared/ResourceFormLayout';
 
-// Rück-Navigation zur Vendors-Tab in der PartsPage
 const VENDORS_TAB_URL = '/parts?tab=vendors';
 
 const schema = z.object({
@@ -25,6 +25,33 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
+function VendorFormSkeleton() {
+  return (
+    <div className="space-y-6 animate-pulse" aria-hidden>
+      <div className="rounded-lg border bg-card p-6 space-y-4">
+        <div className="h-5 w-32 rounded bg-muted" />
+        <div className="space-y-2">
+          <div className="h-4 w-16 rounded bg-muted" />
+          <div className="h-10 w-full rounded-md bg-muted" />
+        </div>
+        <div className="space-y-2">
+          <div className="h-4 w-28 rounded bg-muted" />
+          <div className="h-10 w-full rounded-md bg-muted" />
+        </div>
+      </div>
+      <div className="rounded-lg border bg-card p-6 space-y-4">
+        <div className="h-5 w-24 rounded bg-muted" />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="h-10 w-full rounded-md bg-muted" />
+          <div className="h-10 w-full rounded-md bg-muted" />
+        </div>
+        <div className="h-10 w-full rounded-md bg-muted" />
+        <div className="h-20 w-full rounded-md bg-muted" />
+      </div>
+    </div>
+  );
+}
+
 export function VendorFormPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -32,7 +59,6 @@ export function VendorFormPage() {
   const isEdit = Boolean(id);
 
   // Backend hat keinen getById-Endpoint für Vendors — Liste hat ohnehin alle drin
-  // und wird vom Cache geteilt (queryKey: ['vendors']).
   const { data: vendorsData, isLoading: isLoadingVendors } = useQuery({
     queryKey: ['vendors'],
     queryFn: () => partsApi.listVendors(),
@@ -91,12 +117,37 @@ export function VendorFormPage() {
     },
   });
 
+  const submitHandler = handleSubmit((d) => mutation.mutate(d));
+
+  // Cmd+S / Ctrl+S to save
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        submitHandler();
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [submitHandler]);
+
   if (isEdit && isLoadingVendors) {
-    return <div className="text-muted-foreground">Wird geladen...</div>;
+    return (
+      <div className="flex flex-col min-h-[calc(100vh-7rem)]">
+        <div className="flex items-center gap-3 pb-4 border-b mb-6">
+          <div className="h-9 w-9 rounded bg-muted animate-pulse" />
+          <div className="h-7 w-48 rounded bg-muted animate-pulse" />
+        </div>
+        <div className="flex-1 mx-auto w-full max-w-4xl">
+          <VendorFormSkeleton />
+        </div>
+      </div>
+    );
   }
+
   if (isEdit && !isLoadingVendors && !existing) {
     return (
-      <div className="rounded-md border bg-amber-50 border-amber-200 p-4 text-sm text-amber-900">
+      <div className="rounded-md border bg-muted p-4 text-sm text-muted-foreground">
         <p className="mb-3">Lieferant nicht gefunden.</p>
         <Button variant="outline" onClick={() => navigate(VENDORS_TAB_URL)}>Zurück</Button>
       </div>
@@ -108,44 +159,76 @@ export function VendorFormPage() {
       title={isEdit ? 'Lieferant bearbeiten' : 'Neuer Lieferant'}
       subtitle={existing?.name || undefined}
       onCancel={() => navigate(VENDORS_TAB_URL)}
-      onSubmit={handleSubmit((d) => mutation.mutate(d))}
+      onSubmit={submitHandler}
       isDirty={isDirty}
       isSubmitting={mutation.isPending}
     >
       <FormSection title="Stammdaten">
         <div className="space-y-2">
-          <Label>Name <span className="text-destructive">*</span></Label>
-          <Input placeholder="Lieferant GmbH" {...register('name')} />
-          {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
+          <Label htmlFor="vendor-name">
+            Name <span className="text-destructive" aria-hidden>*</span>
+          </Label>
+          <Input
+            id="vendor-name"
+            placeholder="Lieferant GmbH"
+            aria-required="true"
+            aria-invalid={!!errors.name}
+            {...register('name')}
+          />
+          {errors.name && (
+            <p className="text-xs text-destructive" role="alert">{errors.name.message}</p>
+          )}
         </div>
         <div className="space-y-2">
-          <Label>Ansprechpartner</Label>
-          <Input placeholder="Max Mustermann" {...register('contactPerson')} />
+          <Label htmlFor="vendor-contact-person">Ansprechpartner</Label>
+          <Input
+            id="vendor-contact-person"
+            placeholder="Max Mustermann"
+            {...register('contactPerson')}
+          />
         </div>
       </FormSection>
 
       <FormSection title="Kontakt">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="space-y-2">
-            <Label>E-Mail</Label>
-            <Input type="email" placeholder="info@lieferant.de" {...register('email')} />
-            {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
+            <Label htmlFor="vendor-email">E-Mail</Label>
+            <Input
+              id="vendor-email"
+              type="email"
+              placeholder="info@lieferant.de"
+              aria-invalid={!!errors.email}
+              {...register('email')}
+            />
+            {errors.email && (
+              <p className="text-xs text-destructive" role="alert">{errors.email.message}</p>
+            )}
           </div>
           <div className="space-y-2">
-            <Label>Telefon</Label>
-            <Input placeholder="+49 30 1234567" {...register('phone')} />
+            <Label htmlFor="vendor-phone">Telefon</Label>
+            <Input
+              id="vendor-phone"
+              placeholder="+49 30 1234567"
+              {...register('phone')}
+            />
           </div>
         </div>
         <div className="space-y-2">
-          <Label>Adresse</Label>
-          <Input placeholder="Musterstraße 1, Berlin" {...register('address')} />
+          <Label htmlFor="vendor-address">Adresse</Label>
+          <Input
+            id="vendor-address"
+            placeholder="Musterstraße 1, 10115 Berlin"
+            {...register('address')}
+          />
         </div>
-      </FormSection>
-
-      <FormSection title="Notizen">
         <div className="space-y-2">
-          <Label>Notizen</Label>
-          <Input placeholder="Optionale Notizen" {...register('notes')} />
+          <Label htmlFor="vendor-notes">Notizen</Label>
+          <Textarea
+            id="vendor-notes"
+            placeholder="Zahlungskonditionen, Lieferzeiten, Besonderheiten …"
+            rows={3}
+            {...register('notes')}
+          />
         </div>
       </FormSection>
     </ResourceFormLayout>

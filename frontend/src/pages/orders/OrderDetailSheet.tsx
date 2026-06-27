@@ -1,16 +1,20 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Dialog from '@radix-ui/react-dialog';
+import * as Tabs from '@radix-ui/react-tabs';
 import { X, Trash2, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { ordersApi, type TimeEntryWithStaff, type OrderStatus } from '@/api/orders.api';
 import { staffApi } from '@/api/staff.api';
 import { settingsApi } from '@/api/settings.api';
 import { toast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
 
 interface Props {
   orderId: string | null;
@@ -63,7 +67,7 @@ function StaffDot({ color }: { color?: string }) {
   return (
     <span
       className="inline-block h-2.5 w-2.5 rounded-full shrink-0"
-      style={{ backgroundColor: color || '#94a3b8' }}
+      style={{ backgroundColor: color || 'oklch(var(--muted-foreground))' }}
     />
   );
 }
@@ -71,6 +75,10 @@ function StaffDot({ color }: { color?: string }) {
 export function OrderDetailSheet({ orderId, onClose }: Props) {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<Tab>('overview');
+  const [deleteEntry, setDeleteEntry] = useState<TimeEntryWithStaff | null>(null);
+  // Entries already converted to a labor position this session — prevents double-billing.
+  const [convertedIds, setConvertedIds] = useState<Set<string>>(new Set());
+  const [entryError, setEntryError] = useState<string | null>(null);
 
   // Time entry form state
   const [newStaffId, setNewStaffId] = useState('');
@@ -110,6 +118,7 @@ export function OrderDetailSheet({ orderId, onClose }: Props) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders', orderId, 'time-entries'] });
       toast({ title: 'Zeiterfassung hinzugefügt' });
+      setEntryError(null);
       setNewStaffId('');
       setNewDescription('');
       setNewHours('');
@@ -138,6 +147,7 @@ export function OrderDetailSheet({ orderId, onClose }: Props) {
         description: err.response?.data?.message || 'Eintrag konnte nicht geloscht werden',
       });
     },
+    onSettled: () => setDeleteEntry(null),
   });
 
   const updateStatusMutation = useMutation({
@@ -191,9 +201,10 @@ export function OrderDetailSheet({ orderId, onClose }: Props) {
       };
       await ordersApi.updateItems(orderId!, [...currentItems, newItem]);
     },
-    onSuccess: () => {
+    onSuccess: (_data, entry) => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       toast({ title: 'Arbeitsposition übernommen' });
+      setConvertedIds((prev) => new Set(prev).add(entry.id));
     },
     onError: (err: any) => {
       toast({
@@ -209,13 +220,14 @@ export function OrderDetailSheet({ orderId, onClose }: Props) {
     const m = parseInt(newMinutes || '0', 10);
     const totalMinutes = h * 60 + m;
     if (!newStaffId) {
-      toast({ variant: 'destructive', title: 'Fehler', description: 'Bitte Mitarbeiter auswählen' });
+      setEntryError('Bitte Mitarbeiter auswählen');
       return;
     }
     if (totalMinutes <= 0) {
-      toast({ variant: 'destructive', title: 'Fehler', description: 'Bitte Dauer eingeben' });
+      setEntryError('Bitte Dauer eingeben');
       return;
     }
+    setEntryError(null);
     addTimeEntryMutation.mutate({
       staffId: newStaffId,
       description: newDescription || undefined,
@@ -245,11 +257,12 @@ export function OrderDetailSheet({ orderId, onClose }: Props) {
     : '—';
 
   return (
+    <>
     <Dialog.Root open={isOpen} onOpenChange={(o) => !o && onClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/40 z-40" />
         <Dialog.Content
-          className="fixed right-0 top-0 h-full w-full max-w-[600px] bg-background shadow-xl z-50 flex flex-col overflow-hidden focus:outline-none"
+          className="fixed right-0 top-0 h-full w-full max-w-[820px] bg-background shadow-xl z-50 flex flex-col overflow-hidden focus:outline-none"
           aria-describedby={undefined}
         >
           {/* Header */}
@@ -289,37 +302,40 @@ export function OrderDetailSheet({ orderId, onClose }: Props) {
           </div>
 
           {/* Tabs */}
-          <div className="flex border-b shrink-0">
-            {([
-              { id: 'overview' as Tab, label: 'Übersicht' },
-              { id: 'time' as Tab, label: 'Zeiterfassung' },
-            ] as const).map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                className={cn(
-                  'px-5 py-3 text-sm font-medium border-b-2 transition-colors',
-                  activeTab === tab.id
-                    ? 'border-primary text-foreground'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
-                )}
-                onClick={() => setActiveTab(tab.id)}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+          <Tabs.Root
+            value={activeTab}
+            onValueChange={(v) => setActiveTab(v as Tab)}
+            className="flex flex-1 flex-col overflow-hidden"
+          >
+            <Tabs.List className="flex border-b shrink-0">
+              {([
+                { id: 'overview' as Tab, label: 'Übersicht' },
+                { id: 'time' as Tab, label: 'Zeiterfassung' },
+              ] as const).map((tab) => (
+                <Tabs.Trigger
+                  key={tab.id}
+                  value={tab.id}
+                  className="border-b-2 border-transparent px-5 py-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset data-[state=active]:border-primary data-[state=active]:text-foreground"
+                >
+                  {tab.label}
+                </Tabs.Trigger>
+              ))}
+            </Tabs.List>
 
-          {/* Body */}
-          <div className="flex-1 overflow-y-auto">
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto">
             {orderLoading ? (
-              <div className="p-6 text-center text-muted-foreground text-sm">Wird geladen...</div>
+              <div className="p-5 space-y-3">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="h-16 rounded-lg bg-muted animate-pulse motion-reduce:animate-none" />
+                ))}
+              </div>
             ) : !order ? (
               <div className="p-6 text-center text-muted-foreground text-sm">Auftrag nicht gefunden</div>
             ) : (
               <>
                 {/* Overview Tab */}
-                {activeTab === 'overview' && (
+                <Tabs.Content value="overview" className="focus:outline-none">
                   <div className="p-5 space-y-5">
                     {/* Status-Switcher: alle erlaubten Übergänge als Buttons */}
                     {ALLOWED_TRANSITIONS[order.status as OrderStatus].length > 0 && (
@@ -383,7 +399,8 @@ export function OrderDetailSheet({ orderId, onClose }: Props) {
                       </p>
                     ) : (
                       <div className="rounded-lg border overflow-hidden">
-                        <table className="w-full text-sm">
+                        <div className="overflow-x-auto">
+                        <table className="w-full min-w-[440px] text-sm">
                           <thead className="bg-muted/50 border-b">
                             <tr>
                               <th className="px-3 py-2 text-left font-medium">Typ</th>
@@ -419,6 +436,7 @@ export function OrderDetailSheet({ orderId, onClose }: Props) {
                             ))}
                           </tbody>
                         </table>
+                        </div>
                         <div className="px-3 py-2 border-t bg-muted/30 flex justify-end gap-6 text-sm">
                           <span className="text-muted-foreground">
                             Netto:{' '}
@@ -436,10 +454,10 @@ export function OrderDetailSheet({ orderId, onClose }: Props) {
                       </div>
                     )}
                   </div>
-                )}
+                </Tabs.Content>
 
                 {/* Time tracking Tab */}
-                {activeTab === 'time' && (
+                <Tabs.Content value="time" className="focus:outline-none">
                   <div className="p-5 space-y-5">
                     {/* Existing entries */}
                     {timeLoading ? (
@@ -481,22 +499,26 @@ export function OrderDetailSheet({ orderId, onClose }: Props) {
                                 size="sm"
                                 className="h-7 text-xs"
                                 onClick={() => convertEntryMutation.mutate(entry)}
-                                disabled={convertEntryMutation.isPending}
-                                title="Als Arbeitsposition übernehmen"
+                                disabled={
+                                  convertEntryMutation.isPending ||
+                                  convertedIds.has(entry.id) ||
+                                  order.status === 'invoiced'
+                                }
+                                title={
+                                  order.status === 'invoiced'
+                                    ? 'Auftrag verrechnet — Positionen gesperrt'
+                                    : 'Als Arbeitsposition übernehmen'
+                                }
                               >
-                                Übernehmen
+                                {convertedIds.has(entry.id) ? 'Übernommen' : 'Übernehmen'}
                               </Button>
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 className="h-7 w-7 text-destructive hover:text-destructive"
-                                onClick={() =>
-                                  deleteTimeEntryMutation.mutate({
-                                    staffId: entry.staffId,
-                                    entryId: entry.id,
-                                  })
-                                }
+                                onClick={() => setDeleteEntry(entry)}
                                 disabled={deleteTimeEntryMutation.isPending}
+                                aria-label="Zeiteintrag löschen"
                               >
                                 <Trash2 className="h-3 w-3" />
                               </Button>
@@ -561,6 +583,7 @@ export function OrderDetailSheet({ orderId, onClose }: Props) {
                           </div>
                         </div>
                       </div>
+                      {entryError && <p className="text-xs text-destructive">{entryError}</p>}
                       <Button
                         type="button"
                         size="sm"
@@ -572,12 +595,51 @@ export function OrderDetailSheet({ orderId, onClose }: Props) {
                       </Button>
                     </div>
                   </div>
-                )}
+                </Tabs.Content>
               </>
             )}
-          </div>
+            </div>
+          </Tabs.Root>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
+
+    <AlertDialog
+      open={!!deleteEntry}
+      onOpenChange={(open) => { if (!open) setDeleteEntry(null); }}
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Zeiteintrag löschen?</AlertDialogTitle>
+          <AlertDialogDescription>
+            {deleteEntry && (
+              <>
+                {deleteEntry.staff.firstName} {deleteEntry.staff.lastName} ·{' '}
+                {formatDuration(deleteEntry.durationMinutes || 0)}. Dies kann nicht rückgängig gemacht werden.
+              </>
+            )}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setDeleteEntry(null)}
+            disabled={deleteTimeEntryMutation.isPending}
+          >
+            Abbrechen
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={() => deleteEntry && deleteTimeEntryMutation.mutate({ staffId: deleteEntry.staffId, entryId: deleteEntry.id })}
+            disabled={deleteTimeEntryMutation.isPending}
+          >
+            {deleteTimeEntryMutation.isPending ? 'Wird gelöscht...' : 'Löschen'}
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

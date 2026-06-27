@@ -25,14 +25,14 @@ export function Sidebar() {
 
   return (
     <div className={cn(
-      'fixed left-0 top-0 z-50 h-full bg-gray-900 text-white transition-all duration-300',
+      'fixed left-0 top-0 z-50 h-full border-r border-border bg-card text-card-foreground transition-all duration-300',
       sidebarOpen ? 'w-64' : 'w-16'
     )}>
       {/* Logo */}
-      <div className="flex h-16 items-center gap-3 border-b border-gray-700 px-4">
-        <Wrench className="h-8 w-8 shrink-0 text-blue-400" />
+      <div className="flex h-16 items-center gap-3 border-b border-border px-4">
+        <Wrench className="h-8 w-8 shrink-0 text-primary" />
         {sidebarOpen && (
-          <span className="text-lg font-bold">WerkstattClone</span>
+          <span className="text-lg font-bold tracking-tight">WerkstattClone</span>
         )}
       </div>
 
@@ -48,8 +48,8 @@ export function Sidebar() {
               className={cn(
                 'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
                 isActive
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                  ? 'bg-primary/10 font-medium text-primary'
+                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
               )}
             >
               <Icon className="h-5 w-5 shrink-0" />

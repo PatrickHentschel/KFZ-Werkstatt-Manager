@@ -3,49 +3,57 @@
 @tailwind utilities;
 
 @layer base {
+  /* Brand: steel-petrol primary on cool gunmetal-tinted neutrals.
+     Industrial, no-nonsense. Values are OKLCH (L C H); consumed via
+     oklch(var(--token) / <alpha-value>) in tailwind.config.js.
+     All text pairs verified WCAG AA (see scratchpad contrast check). */
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
+    --background: 0.985 0.004 220;          /* faint cool page */
+    --foreground: 0.22 0.022 240;           /* gunmetal ink */
+    --card: 1 0 0;                          /* white cards lift off the page */
+    --card-foreground: 0.22 0.022 240;
+    --popover: 1 0 0;
+    --popover-foreground: 0.22 0.022 240;
+    --primary: 0.46 0.09 214;               /* steel-petrol: CTAs, selection, focus */
+    --primary-foreground: 0.99 0.005 214;
+    --secondary: 0.94 0.006 220;            /* quiet panel surface */
+    --secondary-foreground: 0.28 0.02 240;
+    --muted: 0.95 0.005 220;
+    --muted-foreground: 0.46 0.015 235;     /* secondary text, AA on white */
+    --accent: 0.93 0.02 215;               /* branded hover/selected wash */
+    --accent-foreground: 0.30 0.04 220;
+    --destructive: 0.485 0.18 27;           /* brick red = error, distinct from primary */
+    --destructive-foreground: 0.99 0.01 27;
+    --success: 0.50 0.13 152;               /* paid / positive. Use bg-success/15 + text-success */
+    --warning: 0.52 0.13 65;                /* draft / low-stock / caution */
+    --border: 0.90 0.006 225;
+    --input: 0.90 0.006 225;
+    --ring: 0.55 0.10 214;
     --radius: 0.5rem;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+    --background: 0.18 0.015 235;           /* brand-tinted near-black */
+    --foreground: 0.95 0.005 220;
+    --card: 0.21 0.018 235;                 /* depth via lighter surface */
+    --card-foreground: 0.95 0.005 220;
+    --popover: 0.21 0.018 235;
+    --popover-foreground: 0.95 0.005 220;
+    --primary: 0.66 0.10 210;               /* brighter, slightly desaturated for dark */
+    --primary-foreground: 0.18 0.02 235;
+    --secondary: 0.27 0.02 235;
+    --secondary-foreground: 0.95 0.005 220;
+    --muted: 0.27 0.02 235;
+    --muted-foreground: 0.70 0.012 225;
+    --accent: 0.30 0.03 215;
+    --accent-foreground: 0.93 0.01 215;
+    --destructive: 0.55 0.17 25;
+    --destructive-foreground: 0.96 0.01 25;
+    --success: 0.78 0.14 152;
+    --warning: 0.80 0.13 75;
+    --border: 0.30 0.015 235;
+    --input: 0.30 0.015 235;
+    --ring: 0.66 0.10 210;
   }
 }
 

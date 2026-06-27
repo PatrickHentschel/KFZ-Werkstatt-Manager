@@ -23,15 +23,15 @@ const nanToUndefined = (v: unknown) => (typeof v === 'number' && isNaN(v) ? unde
 
 const itemSchema = z.object({
   type: z.enum(['labor', 'part', 'misc']),
-  description: z.string().min(1, 'Pflichtfeld'),
-  quantity: z.preprocess(nanToUndefined, z.number().positive()),
-  unitPrice: z.preprocess(nanToUndefined, z.number().nonnegative()),
-  taxRate: z.preprocess(nanToUndefined, z.number().nonnegative()),
+  description: z.string().min(1, 'Bezeichnung ist erforderlich'),
+  quantity: z.preprocess(nanToUndefined, z.number({ invalid_type_error: 'Menge eingeben' }).positive('Menge muss größer als 0 sein')),
+  unitPrice: z.preprocess(nanToUndefined, z.number({ invalid_type_error: 'Preis eingeben' }).nonnegative('Preis darf nicht negativ sein')),
+  taxRate: z.preprocess(nanToUndefined, z.number({ invalid_type_error: 'MwSt eingeben' }).nonnegative('MwSt darf nicht negativ sein')),
   unit: z.string().optional(),
   partId: z.string().uuid().optional(),
   // Rabatt: kein Pflichtfeld, Default 0.
-  discountPercent: z.preprocess(nanToUndefined, z.number().nonnegative().max(100).optional()),
-  discountAmount: z.preprocess(nanToUndefined, z.number().nonnegative().optional()),
+  discountPercent: z.preprocess(nanToUndefined, z.number().nonnegative().max(100, 'Rabatt max. 100%').optional()),
+  discountAmount: z.preprocess(nanToUndefined, z.number().nonnegative('Rabattbetrag darf nicht negativ sein').optional()),
 });
 
 const orderSchema = z.object({
@@ -88,6 +88,7 @@ export function OrderFormPage() {
     formState: { errors, isDirty },
   } = useForm<OrderForm>({
     resolver: zodResolver(orderSchema),
+    mode: 'onTouched',
     defaultValues: {
       customerId: '',
       vehicleId: '',
@@ -223,7 +224,11 @@ export function OrderFormPage() {
           skontoPercent: data.skontoPercent ?? 0,
           skontoDays: data.skontoDays ?? 0,
         });
-        await ordersApi.updateItems(id!, itemsWithSort);
+        try {
+          await ordersApi.updateItems(id!, itemsWithSort);
+        } catch {
+          throw new Error('Auftragsdaten gespeichert, aber die Positionen konnten nicht aktualisiert werden. Bitte erneut speichern.');
+        }
         return id!;
       }
 
@@ -251,7 +256,7 @@ export function OrderFormPage() {
       toast({
         variant: 'destructive',
         title: 'Fehler',
-        description: err.response?.data?.message || 'Speichern fehlgeschlagen',
+        description: err.response?.data?.message || err.message || 'Speichern fehlgeschlagen',
       });
     },
   });
@@ -307,8 +312,29 @@ export function OrderFormPage() {
   };
 
   if (isEdit && isLoadingExisting) {
-    return <div className="text-muted-foreground">Wird geladen...</div>;
+    return (
+      <ResourceFormLayout
+        title="Auftrag bearbeiten"
+        onCancel={() => navigate('/orders')}
+        onSubmit={(e) => e.preventDefault()}
+        isSubmitting
+        submitLabel="Speichern"
+        className="max-w-6xl"
+      >
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="rounded-lg border bg-card p-6 space-y-4">
+            <div className="h-5 w-40 rounded bg-muted animate-pulse motion-reduce:animate-none" />
+            <div className="space-y-2">
+              <div className="h-9 rounded bg-muted animate-pulse motion-reduce:animate-none" />
+              <div className="h-9 w-2/3 rounded bg-muted animate-pulse motion-reduce:animate-none" />
+            </div>
+          </div>
+        ))}
+      </ResourceFormLayout>
+    );
   }
+
+  const isLocked = isEdit && existing?.status === 'invoiced';
 
   return (
     <ResourceFormLayout
@@ -321,6 +347,12 @@ export function OrderFormPage() {
       submitLabel={isEdit ? 'Speichern' : 'Auftrag erstellen'}
       className="max-w-6xl"
     >
+      {isLocked && (
+        <div className="rounded-md border border-warning/30 bg-warning/10 p-3 text-sm text-warning">
+          Dieser Auftrag ist verrechnet. Positionen sind gesperrt, damit die bereits erstellte Rechnung nicht verändert wird.
+        </div>
+      )}
+
       {/* Kunde + Fahrzeug — read-only im Edit */}
       {isEdit && existing ? (
         <FormSection title="Kunde & Fahrzeug" description="Bei bestehenden Aufträgen nicht änderbar">
@@ -447,7 +479,12 @@ export function OrderFormPage() {
           </div>
           <div className="space-y-2">
             <Label>Notizen</Label>
-            <Input placeholder="Interne Notizen..." {...register('notes')} />
+            <textarea
+              rows={3}
+              placeholder="Interne Notizen..."
+              {...register('notes')}
+              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            />
           </div>
         </div>
         <div className="space-y-2">
@@ -482,27 +519,41 @@ export function OrderFormPage() {
         </div>
       </FormSection>
 
-      <FormSection title="Teile-Suche" description="Klick fügt Position automatisch hinzu (Name, Preis, MwSt aus Stammdaten)">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Name, SKU, OEM-Nummer..."
-            value={partSearch}
-            onChange={(e) => setPartSearch(e.target.value)}
-            className="pl-9 h-10"
-          />
-        </div>
-        {debouncedPartSearch.length <= 1 ? (
-          <p className="text-sm text-muted-foreground text-center py-4">
-            Mind. 2 Zeichen eingeben um Teile zu suchen
-          </p>
-        ) : partsData?.data.data.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-4">
-            Keine Teile gefunden
-          </p>
-        ) : (
+      <fieldset disabled={isLocked} className="contents">
+      <FormSection
+        title="Positionen"
+        description="Teile suchen oder manuell hinzufügen — ein Klick übernimmt Name, Preis und MwSt aus den Stammdaten."
+      >
+        <div className="space-y-3">
+          {/* Toolbar: manuelle Typ-Buttons + Teile-Suche gehören zur selben Aufgabe */}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap gap-2">
+              {(['labor', 'part', 'misc'] as const).map((t) => (
+                <Button key={t} type="button" variant="outline" size="sm" onClick={() => addItem(t)}>
+                  <Plus className="mr-1 h-3 w-3" /> {TYPE_LABEL[t]}
+                </Button>
+              ))}
+            </div>
+            <div className="relative w-full sm:w-72">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Teile suchen (Name, SKU, OEM)..."
+                value={partSearch}
+                onChange={(e) => setPartSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+          </div>
+
+          {debouncedPartSearch.length > 1 && (
+            partsData?.data.data.length === 0 ? (
+              <p className="rounded-md border bg-muted/20 py-4 text-center text-sm text-muted-foreground">
+                Keine Teile gefunden
+              </p>
+            ) : (
           <div className="rounded-md border overflow-hidden">
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-sm">
               <thead className="bg-muted/50 border-b">
                 <tr>
                   <th className="px-3 py-2 text-left font-medium">Name</th>
@@ -538,7 +589,7 @@ export function OrderFormPage() {
                       </td>
                       <td className={cn(
                         'px-3 py-2 text-right tabular-nums',
-                        lowStock && 'text-orange-600 font-medium',
+                        lowStock && 'text-warning font-medium',
                       )}>
                         {p.stockQuantity} {p.unit}
                       </td>
@@ -559,40 +610,33 @@ export function OrderFormPage() {
                 })}
               </tbody>
             </table>
+            </div>
           </div>
-        )}
-      </FormSection>
-
-      <FormSection title="Positionen" description="Manuell hinzufügen oder via Teile-Suche oben">
-        <div className="space-y-3">
-          <div className="flex flex-wrap gap-2">
-            {(['labor', 'part', 'misc'] as const).map((t) => (
-              <Button key={t} type="button" variant="outline" size="sm" onClick={() => addItem(t)}>
-                <Plus className="mr-1 h-3 w-3" /> {TYPE_LABEL[t]}
-              </Button>
-            ))}
-          </div>
+        ))}
 
             {fields.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-6 border rounded-lg">
                 Noch keine Positionen
               </p>
             ) : (
-              <div className="space-y-2">
-                <div className="grid grid-cols-[70px_minmax(0,1fr)_100px_100px_100px_70px_40px] gap-2 px-2 text-xs text-muted-foreground">
-                  <div>Typ</div>
-                  <div>Bezeichnung</div>
-                  <div>Menge</div>
-                  <div className="text-right">EK (€)</div>
-                  <div className="text-right">VK (€)</div>
-                  <div className="text-right">MwSt</div>
-                  <div />
-                </div>
+              <div className="space-y-3">
+                <div className="overflow-x-auto">
+                  <div className="min-w-[720px] space-y-2">
+                    <div className="grid grid-cols-[70px_minmax(0,1fr)_100px_100px_100px_70px_40px] gap-2 px-2 text-xs text-muted-foreground">
+                      <div>Typ</div>
+                      <div>Bezeichnung</div>
+                      <div>Menge</div>
+                      <div className="text-right">EK (€)</div>
+                      <div className="text-right">VK (€)</div>
+                      <div className="text-right">MwSt</div>
+                      <div />
+                    </div>
+                    <div className="rounded-lg border divide-y">
                 {fields.map((field, idx) => {
                   const itemType = field.type;
                   const ek = field.partId ? partCosts[field.partId] : undefined;
                   return (
-                    <div key={field.id} className="rounded-lg border p-2 space-y-2">
+                    <div key={field.id} className="p-2 space-y-2">
                       <div className="grid grid-cols-[70px_minmax(0,1fr)_100px_100px_100px_70px_40px] gap-2 items-start">
                         <div className="pt-1">
                           <Badge variant="outline" className="text-xs">{TYPE_LABEL[itemType]}</Badge>
@@ -604,14 +648,14 @@ export function OrderFormPage() {
                             className="h-8 text-sm"
                           />
                           {errors.items?.[idx]?.description && (
-                            <p className="text-xs text-destructive">Pflichtfeld</p>
+                            <p className="text-xs text-destructive">{errors.items[idx].description?.message}</p>
                           )}
                         </div>
                         <div>
                           <div className="flex items-center gap-1">
                             <Input
                               type="number"
-                              step="0.01"
+                              step="1"
                               placeholder="Menge"
                               {...register(`items.${idx}.quantity`, { valueAsNumber: true })}
                               className="h-8 text-sm"
@@ -622,7 +666,7 @@ export function OrderFormPage() {
                               </span>
                             )}
                           </div>
-                          {errors.items?.[idx]?.quantity && <p className="text-xs text-destructive">Pflichtfeld</p>}
+                          {errors.items?.[idx]?.quantity && <p className="text-xs text-destructive">{errors.items[idx].quantity?.message}</p>}
                         </div>
                         <div className="h-8 flex items-center justify-end text-sm tabular-nums text-muted-foreground">
                           {ek != null ? formatCurrency(ek) : '—'}
@@ -635,7 +679,7 @@ export function OrderFormPage() {
                             {...register(`items.${idx}.unitPrice`, { valueAsNumber: true })}
                             className="h-8 text-sm text-right tabular-nums"
                           />
-                          {errors.items?.[idx]?.unitPrice && <p className="text-xs text-destructive">Pflichtfeld</p>}
+                          {errors.items?.[idx]?.unitPrice && <p className="text-xs text-destructive">{errors.items[idx].unitPrice?.message}</p>}
                         </div>
                         <div>
                           <Input
@@ -645,7 +689,7 @@ export function OrderFormPage() {
                             {...register(`items.${idx}.taxRate`, { valueAsNumber: true })}
                             className="h-8 text-sm text-right tabular-nums"
                           />
-                          {errors.items?.[idx]?.taxRate && <p className="text-xs text-destructive">Pflichtfeld</p>}
+                          {errors.items?.[idx]?.taxRate && <p className="text-xs text-destructive">{errors.items[idx].taxRate?.message}</p>}
                         </div>
                         <div className="flex justify-end">
                           <Button
@@ -706,6 +750,9 @@ export function OrderFormPage() {
                     </div>
                   );
                 })}
+                    </div>
+                  </div>
+                </div>
 
                 <div className="flex justify-end gap-4 text-sm pt-1">
                   <span className="text-muted-foreground">
@@ -719,6 +766,7 @@ export function OrderFormPage() {
             )}
         </div>
       </FormSection>
+      </fieldset>
     </ResourceFormLayout>
   );
 }

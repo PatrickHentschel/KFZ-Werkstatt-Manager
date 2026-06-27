@@ -147,7 +147,7 @@ export function PartsPage() {
                             {part.category && <Badge variant="outline">{part.category}</Badge>}
                           </td>
                           <td className="px-4 py-3 text-right">
-                            <div className={`flex items-center justify-end gap-2 ${isLowStock ? 'text-orange-600' : ''}`}>
+                            <div className={`flex items-center justify-end gap-2 ${isLowStock ? 'text-warning' : ''}`}>
                               {isLowStock && <AlertTriangle className="h-4 w-4" />}
                               <span className="font-medium">{part.stockQuantity} {part.unit}</span>
                             </div>

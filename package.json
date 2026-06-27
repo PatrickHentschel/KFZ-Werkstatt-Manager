@@ -14,6 +14,6 @@
     "build": "npm run build --workspace=packages/shared && npm run build --workspace=backend && npm run build --workspace=frontend",
     "db:migrate": "npm run db:migrate --workspace=backend",
     "db:seed": "npm run db:seed --workspace=backend",
-    "reset": "docker-compose down -v && docker-compose up -d && sleep 5 && npm run db:migrate && npm run db:seed"
+    "reset": "docker-compose down -v && docker-compose up -d && sleep 10 && docker-compose exec backend npm run db:migrate && docker-compose exec backend npm run db:seed"
   }
 }

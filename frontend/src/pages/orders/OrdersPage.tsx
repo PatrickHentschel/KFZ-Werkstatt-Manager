@@ -1,11 +1,16 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Pencil } from 'lucide-react';
+import { Plus, Search, Pencil, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { EmptyState } from '@/components/shared/EmptyState';
 import { ordersApi, type Order, type OrderStatus } from '@/api/orders.api';
 import { toast } from '@/hooks/use-toast';
 import { OrderDetailSheet } from './OrderDetailSheet';
@@ -58,6 +63,7 @@ export function OrdersPage() {
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | OrderStatus>('all');
   const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
+  const [invoiceConfirm, setInvoiceConfirm] = useState<Order | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['orders', { page, search, activeTab }],
@@ -83,6 +89,7 @@ export function OrdersPage() {
         description: err.response?.data?.message,
       });
     },
+    onSettled: () => setInvoiceConfirm(null),
   });
 
   const updateStatusMutation = useMutation({
@@ -103,6 +110,7 @@ export function OrdersPage() {
 
   const orders = data?.data.data ?? [];
   const totalPages = data?.data.totalPages ?? 1;
+  const isFiltered = Boolean(search) || activeTab !== 'all';
 
   return (
     <div className="space-y-6">
@@ -142,86 +150,119 @@ export function OrdersPage() {
       <Card>
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="p-6 text-center text-muted-foreground">Wird geladen...</div>
+            <div className="divide-y">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-4 px-4 py-3.5">
+                  <div className="h-4 w-24 shrink-0 rounded bg-muted animate-pulse motion-reduce:animate-none" />
+                  <div className="h-4 flex-1 rounded bg-muted animate-pulse motion-reduce:animate-none" />
+                  <div className="h-5 w-20 shrink-0 rounded-full bg-muted animate-pulse motion-reduce:animate-none" />
+                </div>
+              ))}
+            </div>
           ) : orders.length === 0 ? (
-            <div className="p-6 text-center text-muted-foreground">Keine Aufträge vorhanden</div>
+            isFiltered ? (
+              <EmptyState
+                icon={Search}
+                title="Keine Treffer"
+                body="Keine Aufträge passen zu Suche oder Filter. Andere Eingabe probieren."
+              />
+            ) : (
+              <EmptyState
+                icon={ClipboardList}
+                title="Noch keine Aufträge"
+                body="Lege deinen ersten Auftrag an, um Fahrzeuge durch die Werkstatt zu verfolgen."
+                ctaLabel="Neuer Auftrag"
+                ctaTo="/orders/new"
+              />
+            )
           ) : (
-            <table className="w-full">
-              <thead className="border-b bg-muted/50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-sm font-medium">Auftragsnr.</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">Fahrzeug</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">Kunde</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">Erstellt</th>
-                  <th className="px-4 py-3 text-right text-sm font-medium">Aktion</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {orders.map((o: Order) => {
-                  const next = nextStatus[o.status];
-                  const customerName = o.customer
-                    ? (o.customer.companyName || `${o.customer.firstName || ''} ${o.customer.lastName || ''}`.trim())
-                    : '—';
-                  return (
-                    <tr
-                      key={o.id}
-                      className="hover:bg-muted/30 cursor-pointer"
-                      onClick={() => setDetailOrderId(o.id)}
-                    >
-                      <td className="px-4 py-3 font-medium">{o.orderNumber}</td>
-                      <td className="px-4 py-3 text-sm">
-                        {o.vehicle
-                          ? `${o.vehicle.licensePlate} — ${o.vehicle.make} ${o.vehicle.model}`
-                          : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-sm">{customerName || '—'}</td>
-                      <td className="px-4 py-3">
-                        <Badge variant={statusVariant[o.status]}>
-                          {statusLabel[o.status]}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">
-                        {new Date(o.createdAt).toLocaleDateString('de-DE')}
-                      </td>
-                      <td
-                        className="px-4 py-3 text-right space-x-2"
-                        onClick={(e) => e.stopPropagation()}
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[720px]">
+                <thead className="border-b bg-muted/50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-sm font-medium">Auftragsnr.</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium">Fahrzeug</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium">Kunde</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium">Erstellt</th>
+                    <th className="px-4 py-3 text-right text-sm font-medium">Aktion</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {orders.map((o: Order) => {
+                    const next = nextStatus[o.status];
+                    const customerName = o.customer
+                      ? (o.customer.companyName || `${o.customer.firstName || ''} ${o.customer.lastName || ''}`.trim())
+                      : '—';
+                    return (
+                      <tr
+                        key={o.id}
+                        className="hover:bg-muted/30 cursor-pointer"
+                        onClick={() => setDetailOrderId(o.id)}
                       >
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => navigate(`/orders/${o.id}/edit`)}
-                          title="Bearbeiten"
+                        <td className="px-4 py-3">
+                          <button
+                            type="button"
+                            className="rounded font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            onClick={(e) => { e.stopPropagation(); setDetailOrderId(o.id); }}
+                          >
+                            {o.orderNumber}
+                          </button>
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          {o.vehicle
+                            ? `${o.vehicle.licensePlate} — ${o.vehicle.make} ${o.vehicle.model}`
+                            : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-sm">{customerName || '—'}</td>
+                        <td className="px-4 py-3">
+                          <Badge variant={statusVariant[o.status]}>
+                            {statusLabel[o.status]}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground">
+                          {new Date(o.createdAt).toLocaleDateString('de-DE')}
+                        </td>
+                        <td
+                          className="px-4 py-3 text-right space-x-2 whitespace-nowrap"
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        {o.status === 'done' && (
                           <Button
-                            variant="default"
-                            size="sm"
-                            onClick={() => createInvoiceMutation.mutate(o.id)}
-                            disabled={createInvoiceMutation.isPending}
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => navigate(`/orders/${o.id}/edit`)}
+                            title="Bearbeiten"
+                            aria-label={`Auftrag ${o.orderNumber} bearbeiten`}
                           >
-                            Rechnung erstellen
+                            <Pencil className="h-4 w-4" />
                           </Button>
-                        )}
-                        {next && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => updateStatusMutation.mutate({ id: o.id, status: next })}
-                            disabled={updateStatusMutation.isPending}
-                          >
-                            {nextStatusLabel[o.status]}
-                          </Button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                          {o.status === 'done' && (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => setInvoiceConfirm(o)}
+                              disabled={createInvoiceMutation.isPending}
+                            >
+                              Rechnung erstellen
+                            </Button>
+                          )}
+                          {next && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => updateStatusMutation.mutate({ id: o.id, status: next })}
+                              disabled={updateStatusMutation.isPending}
+                            >
+                              {nextStatusLabel[o.status]}
+                            </Button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -239,6 +280,38 @@ export function OrdersPage() {
       )}
 
       <OrderDetailSheet orderId={detailOrderId} onClose={() => setDetailOrderId(null)} />
+
+      <AlertDialog
+        open={!!invoiceConfirm}
+        onOpenChange={(open) => { if (!open) setInvoiceConfirm(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Rechnung erstellen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Für Auftrag {invoiceConfirm?.orderNumber} wird ein Rechnungsentwurf erstellt und geöffnet.
+              Der Auftrag wird als verrechnet markiert.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setInvoiceConfirm(null)}
+              disabled={createInvoiceMutation.isPending}
+            >
+              Abbrechen
+            </Button>
+            <Button
+              type="button"
+              onClick={() => invoiceConfirm && createInvoiceMutation.mutate(invoiceConfirm.id)}
+              disabled={createInvoiceMutation.isPending}
+            >
+              {createInvoiceMutation.isPending ? 'Wird erstellt...' : 'Rechnung erstellen'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

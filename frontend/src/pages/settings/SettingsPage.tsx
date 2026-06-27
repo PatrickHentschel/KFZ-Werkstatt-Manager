@@ -104,7 +104,7 @@ export function SettingsPage() {
       {settings && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <span>Plan:</span>
-          <span className="rounded-full bg-blue-100 text-blue-700 px-2 py-0.5 text-xs font-medium capitalize">
+          <span className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-xs font-medium capitalize">
             {settings.plan}
           </span>
           <span>•</span>

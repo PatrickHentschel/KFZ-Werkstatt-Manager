@@ -22,12 +22,19 @@ const schema = z.object({
   lastName: z.string().optional(),
   companyName: z.string().optional(),
   birthDate: z.string().optional(),
-  email: z.string().email().optional().or(z.literal('')),
-  phone: z.string().refine((v) => !v || PHONE_RE.test(v), 'Format: +49... oder 0...').optional(),
+  email: z.string().email('Ungültige E-Mail-Adresse').optional().or(z.literal('')),
+  phone: z.string().refine((v) => !v || PHONE_RE.test(v), 'Format: +49 30 1234567 oder 030 1234567').optional(),
   street: z.string().optional(),
-  houseNumber: z.string().refine((v) => !v || HOUSE_NR_RE.test(v), 'Ungültige Hausnummer').optional(),
+  houseNumber: z.string().refine((v) => !v || HOUSE_NR_RE.test(v), 'Ungültige Hausnummer (z.B. 12 oder 12a)').optional(),
   city: z.string().optional(),
-  postalCode: z.string().refine((v) => !v || PLZ_RE.test(v), 'PLZ muss 5 Ziffern enthalten').optional(),
+  postalCode: z.string().refine((v) => !v || PLZ_RE.test(v), 'PLZ muss genau 5 Ziffern enthalten').optional(),
+}).superRefine((data, ctx) => {
+  if (data.type === 'private' && !data.firstName?.trim() && !data.lastName?.trim()) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Bitte mindestens Vor- oder Nachname angeben', path: ['lastName'] });
+  }
+  if (data.type === 'business' && !data.companyName?.trim()) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Firmenname ist erforderlich', path: ['companyName'] });
+  }
 });
 
 type FormData = z.infer<typeof schema>;
@@ -53,6 +60,7 @@ export function CustomerFormPage() {
   } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: { type: 'private' },
+    mode: 'onTouched',
   });
 
   const customerType = watch('type');
@@ -93,7 +101,7 @@ export function CustomerFormPage() {
       navigate('/customers');
     },
     onError: (err: any) => {
-      toast({ variant: 'destructive', title: 'Fehler', description: err.response?.data?.message });
+      toast({ variant: 'destructive', title: 'Fehler', description: err.response?.data?.message || 'Speichern fehlgeschlagen' });
     },
   });
 
@@ -105,7 +113,24 @@ export function CustomerFormPage() {
   };
 
   if (isEdit && isLoadingExisting) {
-    return <div className="text-muted-foreground">Wird geladen...</div>;
+    return (
+      <ResourceFormLayout
+        title="Kunde bearbeiten"
+        onCancel={() => navigate('/customers')}
+        onSubmit={(e) => e.preventDefault()}
+        isSubmitting
+      >
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="rounded-lg border bg-card p-6 space-y-4">
+            <div className="h-5 w-40 rounded bg-muted animate-pulse motion-reduce:animate-none" />
+            <div className="space-y-2">
+              <div className="h-9 rounded bg-muted animate-pulse motion-reduce:animate-none" />
+              <div className="h-9 w-2/3 rounded bg-muted animate-pulse motion-reduce:animate-none" />
+            </div>
+          </div>
+        ))}
+      </ResourceFormLayout>
+    );
   }
 
   return (
@@ -123,7 +148,7 @@ export function CustomerFormPage() {
             <label
               key={t}
               className={cn(
-                'flex-1 cursor-pointer rounded-md border p-3 text-center text-sm transition-colors',
+                'flex-1 cursor-pointer rounded-md border p-3 text-center text-sm transition-colors focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2',
                 customerType === t ? 'border-primary bg-primary/10 text-primary' : 'hover:bg-muted',
               )}
             >
@@ -137,15 +162,18 @@ export function CustomerFormPage() {
       <FormSection title="Stammdaten">
         {customerType === 'business' ? (
           <div className="space-y-2">
-            <Label>Firmenname</Label>
-            <Input placeholder="Mustermann GmbH" {...register('companyName')} />
+            <Label htmlFor="cust-company">Firmenname <span className="text-destructive">*</span></Label>
+            <Input id="cust-company" autoComplete="organization" placeholder="Mustermann GmbH" {...register('companyName')} />
+            {errors.companyName && <p className="text-xs text-destructive">{errors.companyName.message}</p>}
           </div>
         ) : (
           <>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-[160px_1fr_1fr]">
               <div className="space-y-2">
-                <Label>Anrede</Label>
+                <Label htmlFor="cust-salutation">Anrede</Label>
                 <select
+                  id="cust-salutation"
+                  autoComplete="honorific-prefix"
                   {...register('salutation')}
                   className="flex h-9 w-full rounded-md border border-input bg-background px-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
                 >
@@ -156,17 +184,18 @@ export function CustomerFormPage() {
                 </select>
               </div>
               <div className="space-y-2">
-                <Label>Vorname</Label>
-                <Input placeholder="Max" {...register('firstName')} />
+                <Label htmlFor="cust-firstName">Vorname</Label>
+                <Input id="cust-firstName" autoComplete="given-name" placeholder="Max" {...register('firstName')} />
               </div>
               <div className="space-y-2">
-                <Label>Nachname</Label>
-                <Input placeholder="Mustermann" {...register('lastName')} />
+                <Label htmlFor="cust-lastName">Nachname <span className="text-destructive">*</span></Label>
+                <Input id="cust-lastName" autoComplete="family-name" placeholder="Mustermann" {...register('lastName')} />
+                {errors.lastName && <p className="text-xs text-destructive">{errors.lastName.message}</p>}
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Geburtsdatum</Label>
-              <Input type="date" {...register('birthDate')} className="w-48" />
+              <Label htmlFor="cust-birthDate">Geburtsdatum</Label>
+              <Input id="cust-birthDate" type="date" autoComplete="bday" max={new Date().toISOString().split('T')[0]} {...register('birthDate')} className="w-48" />
             </div>
           </>
         )}
@@ -175,13 +204,13 @@ export function CustomerFormPage() {
       <FormSection title="Kontakt">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="space-y-2">
-            <Label>E-Mail</Label>
-            <Input type="email" placeholder="max@example.de" {...register('email')} />
+            <Label htmlFor="cust-email">E-Mail</Label>
+            <Input id="cust-email" type="email" autoComplete="email" placeholder="max@example.de" {...register('email')} />
             {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
           </div>
           <div className="space-y-2">
-            <Label>Telefon</Label>
-            <Input placeholder="+49 30 1234567" {...register('phone')} />
+            <Label htmlFor="cust-phone">Telefon</Label>
+            <Input id="cust-phone" type="tel" autoComplete="tel" placeholder="+49 30 1234567" {...register('phone')} />
             {errors.phone && <p className="text-xs text-destructive">{errors.phone.message}</p>}
           </div>
         </div>
@@ -190,12 +219,12 @@ export function CustomerFormPage() {
       <FormSection title="Adresse">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_140px]">
           <div className="space-y-2">
-            <Label>Straße</Label>
-            <Input placeholder="Musterstraße" {...register('street')} />
+            <Label htmlFor="cust-street">Straße</Label>
+            <Input id="cust-street" autoComplete="address-line1" placeholder="Musterstraße" {...register('street')} />
           </div>
           <div className="space-y-2">
-            <Label>Hausnummer</Label>
-            <Input placeholder="12a" {...register('houseNumber')} />
+            <Label htmlFor="cust-houseNumber">Hausnummer</Label>
+            <Input id="cust-houseNumber" autoComplete="address-line2" placeholder="12a" {...register('houseNumber')} />
             {errors.houseNumber && (
               <p className="text-xs text-destructive">{errors.houseNumber.message}</p>
             )}
@@ -203,15 +232,15 @@ export function CustomerFormPage() {
         </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <div className="space-y-2">
-            <Label>PLZ</Label>
-            <Input placeholder="10115" maxLength={5} {...register('postalCode')} />
+            <Label htmlFor="cust-postalCode">PLZ</Label>
+            <Input id="cust-postalCode" autoComplete="postal-code" inputMode="numeric" placeholder="10115" maxLength={5} {...register('postalCode')} />
             {errors.postalCode && (
               <p className="text-xs text-destructive">{errors.postalCode.message}</p>
             )}
           </div>
           <div className="space-y-2 md:col-span-2">
-            <Label>Stadt</Label>
-            <Input placeholder="Berlin" {...register('city')} />
+            <Label htmlFor="cust-city">Stadt</Label>
+            <Input id="cust-city" autoComplete="address-level2" placeholder="Berlin" {...register('city')} />
           </div>
         </div>
       </FormSection>

@@ -1,11 +1,16 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Plus, FileDown, Pencil, Search, Send, Ban } from 'lucide-react';
+import { Plus, FileDown, Pencil, Search, Send, Ban, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { EmptyState } from '@/components/shared/EmptyState';
 import { invoicesApi, type Invoice, type InvoiceStatus } from '@/api/invoices.api';
 import { toast } from '@/hooks/use-toast';
 import { formatDate } from '@/lib/locale';
@@ -47,6 +52,7 @@ export function InvoicesPage() {
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | InvoiceStatus>('all');
   const [previewIntent, setPreviewIntent] = useState<PreviewIntent | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<Invoice | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['invoices', { page, search, activeTab }],
@@ -103,6 +109,7 @@ export function InvoicesPage() {
     onError: (err: any) => {
       toast({ variant: 'destructive', title: err?.response?.data?.message || 'Storno fehlgeschlagen' });
     },
+    onSettled: () => setCancelTarget(null),
   });
 
   const isPreviewBusy = markSent.isPending || sendInvoice.isPending;
@@ -112,6 +119,10 @@ export function InvoicesPage() {
     if (previewIntent.kind === 'mark-sent') await markSent.mutateAsync(previewIntent.id);
     else await sendInvoice.mutateAsync(previewIntent.id);
   };
+
+  const invoices = data?.data.data ?? [];
+  const totalPages = data?.data.totalPages ?? 1;
+  const isFiltered = Boolean(search) || activeTab !== 'all';
 
   return (
     <div className="space-y-6">
@@ -151,9 +162,34 @@ export function InvoicesPage() {
       <Card>
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="p-6 text-center text-muted-foreground">Wird geladen...</div>
+            <div className="divide-y">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-4 px-4 py-3.5">
+                  <div className="h-4 w-28 shrink-0 rounded bg-muted animate-pulse motion-reduce:animate-none" />
+                  <div className="h-4 flex-1 rounded bg-muted animate-pulse motion-reduce:animate-none" />
+                  <div className="h-5 w-16 shrink-0 rounded-full bg-muted animate-pulse motion-reduce:animate-none" />
+                </div>
+              ))}
+            </div>
+          ) : invoices.length === 0 ? (
+            isFiltered ? (
+              <EmptyState
+                icon={Search}
+                title="Keine Treffer"
+                body="Keine Rechnungen passen zu Suche oder Filter. Andere Eingabe probieren."
+              />
+            ) : (
+              <EmptyState
+                icon={FileText}
+                title="Noch keine Rechnungen"
+                body="Erstelle deine erste Rechnung aus einem Auftrag oder von Grund auf."
+                ctaLabel="Neue Rechnung"
+                ctaTo="/invoices/new"
+              />
+            )
           ) : (
-            <table className="w-full">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[680px]">
               <thead className="border-b bg-muted/50">
                 <tr>
                   <th className="px-4 py-3 text-left text-sm font-medium">Rechnungsnr.</th>
@@ -164,12 +200,12 @@ export function InvoicesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {data?.data.data.map((inv: Invoice) => (
+                {invoices.map((inv: Invoice) => (
                   <tr key={inv.id} className="hover:bg-muted/30">
                     <td className="px-4 py-3 font-medium">{inv.invoiceNumber}</td>
                     <td className="px-4 py-3 text-sm">
                       {inv.customer
-                        ? `${inv.customer.firstName || ''} ${inv.customer.lastName || ''}${inv.customer.companyName || ''}`.trim()
+                        ? (inv.customer.companyName || `${inv.customer.firstName || ''} ${inv.customer.lastName || ''}`.trim() || '—')
                         : '—'}
                     </td>
                     <td className="px-4 py-3 text-sm text-muted-foreground">
@@ -226,11 +262,8 @@ export function InvoicesPage() {
                             variant="outline"
                             size="icon"
                             title="Stornieren"
-                            onClick={() => {
-                              if (confirm(`Rechnung ${inv.invoiceNumber} wirklich stornieren? Es wird eine Stornorechnung mit negativen Beträgen erstellt.`)) {
-                                cancelInvoice.mutate(inv.id);
-                              }
-                            }}
+                            aria-label={`Rechnung ${inv.invoiceNumber} stornieren`}
+                            onClick={() => setCancelTarget(inv)}
                             disabled={cancelInvoice.isPending}
                           >
                             <Ban className="h-4 w-4 text-destructive" />
@@ -250,9 +283,22 @@ export function InvoicesPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </CardContent>
       </Card>
+
+      {totalPages > 1 && (
+        <div className="flex justify-center gap-2">
+          <Button variant="outline" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
+            Zurück
+          </Button>
+          <span className="flex items-center text-sm">Seite {page} von {totalPages}</span>
+          <Button variant="outline" disabled={page === totalPages} onClick={() => setPage((p) => p + 1)}>
+            Weiter
+          </Button>
+        </div>
+      )}
 
       <PreviewDialog
         open={!!previewIntent}
@@ -263,6 +309,39 @@ export function InvoicesPage() {
         onConfirm={handleConfirmPreview}
         onClose={() => setPreviewIntent(null)}
       />
+
+      <AlertDialog
+        open={!!cancelTarget}
+        onOpenChange={(open) => { if (!open) setCancelTarget(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Rechnung stornieren?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Für {cancelTarget?.invoiceNumber} wird eine Stornorechnung mit negativen Beträgen erstellt
+              und als PDF heruntergeladen. Dies kann nicht rückgängig gemacht werden.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setCancelTarget(null)}
+              disabled={cancelInvoice.isPending}
+            >
+              Abbrechen
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => cancelTarget && cancelInvoice.mutate(cancelTarget.id)}
+              disabled={cancelInvoice.isPending}
+            >
+              {cancelInvoice.isPending ? 'Wird storniert...' : 'Stornieren'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

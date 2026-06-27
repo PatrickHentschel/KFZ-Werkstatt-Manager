@@ -237,3 +237,13 @@ Multi-tenant workshop management app for automotive repair shops. Manages custom
 
 ## Cross-Cutting Concerns
 
+## Design Context
+
+See `PRODUCT.md` (repo root) for the full design brief. Quick pointer for agents touching frontend:
+
+- **Register**: product (app UI that serves workflows — not a marketing site).
+- **Personality**: sturdy, no-nonsense, fast. A workshop tool, not a SaaS showpiece.
+- **Anti-references**: generic shadcn demo, cluttered legacy ERP, playful/consumer app, heavy dark "command center" dashboard.
+- **Principles**: function before flourish · never lose work (drafts persist, status visible) · glance-able status · fast paths for shared screens · quiet density.
+- **Color**: OKLCH tokens in `frontend/src/index.css`, consumed via `oklch(var(--token) / <alpha-value>)` in `tailwind.config.js`. Primary = steel-petrol `oklch(0.46 0.09 214)`, reserved for CTAs / selection / focus. Restrained strategy. Use theme tokens (`bg-primary`, `text-muted-foreground`) — **not hardcoded Tailwind colors** (`bg-gray-900`, `bg-blue-600`). Target WCAG AA.
+
